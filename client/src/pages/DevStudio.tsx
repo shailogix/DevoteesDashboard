@@ -32,6 +32,9 @@ import {
 } from "lucide-react";
 import { useVisualEditor } from "@/contexts/VisualEditorContext";
 import { adminFetch } from "@/contexts/DevModeContext";
+import { SchemaVisualizer } from "@/components/DevStudio/SchemaVisualizer";
+import { CsvExportImport } from "@/components/DevStudio/CsvExportImport";
+import { ApiDocumentation } from "@/components/DevStudio/ApiDocumentation";
 
 const ICON_OPTIONS = [
   "Home", "Users", "Building", "GraduationCap", "Calendar", "Heart",
@@ -2043,6 +2046,12 @@ export default function DevStudio() {
     { id: "page-builder", label: "Page Builder", icon: Layers },
     { id: "schema-builder", label: "Schema Builder", icon: Table },
     { id: "api-builder", label: "API Builder", icon: Terminal },
+    { id: "schema-visualizer", label: "Schema Visualizer", icon: GitBranch },
+  ];
+
+  const TAB_ROW1_EXTRA = [
+    { id: "csv-import", label: "CSV Import/Export", icon: Download },
+    { id: "api-docs", label: "API Docs", icon: FileJson },
   ];
 
   const TAB_ROW2 = [
@@ -2078,9 +2087,17 @@ export default function DevStudio() {
           {/* Three-row tab layout for 15 tabs */}
           <div className="space-y-1 mb-5">
             <div className="text-xs text-muted-foreground px-1 mb-1 font-medium tracking-wider">CONFIGURATION</div>
-            <TabsList className="grid grid-cols-8 w-full bg-muted/60">
+            <TabsList className="grid grid-cols-9 w-full bg-muted/60">
               {TAB_ROW1.map(({ id, label, icon: Icon }) => (
                 <TabsTrigger key={id} value={id} className="flex items-center gap-1.5 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                  <Icon className="w-3.5 h-3.5" /> {label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            <div className="text-xs text-muted-foreground px-1 mt-1 mb-1 font-medium tracking-wider">DATA & DOCUMENTATION</div>
+            <TabsList className="grid grid-cols-2 w-full bg-green-50 border border-green-200">
+              {TAB_ROW1_EXTRA.map(({ id, label, icon: Icon }) => (
+                <TabsTrigger key={id} value={id} className="flex items-center gap-1.5 text-xs data-[state=active]:bg-green-500 data-[state=active]:text-white data-[state=active]:shadow-sm">
                   <Icon className="w-3.5 h-3.5" /> {label}
                 </TabsTrigger>
               ))}
@@ -2641,6 +2658,21 @@ export default function DevStudio() {
           {/* ── API BUILDER ── */}
           <TabsContent value="api-builder">
             <ApiBuilderPanel />
+          </TabsContent>
+
+          {/* ── SCHEMA VISUALIZER ── */}
+          <TabsContent value="schema-visualizer">
+            <SchemaVisualizer />
+          </TabsContent>
+
+          {/* ── CSV IMPORT/EXPORT ── */}
+          <TabsContent value="csv-import">
+            <CsvExportImport />
+          </TabsContent>
+
+          {/* ── API DOCUMENTATION ── */}
+          <TabsContent value="api-docs">
+            <ApiDocumentation />
           </TabsContent>
         </Tabs>
       </main>

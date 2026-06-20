@@ -1811,6 +1811,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
+  // ─── ENTITY EXPORT (single table) ──────────────────────────────────────────
+  app.get('/api/admin/export/entity', isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const table = req.query.table as string;
+      let data: any[] = [];
+      switch (table) {
+        case "devotees": data = await storage.getDevotees(); break;
+        case "families": data = await storage.getFamilies(); break;
+        case "events": data = await storage.getEvents(); break;
+        case "attendance": data = await storage.getAttendance(); break;
+        case "donations": data = await storage.getDonations(); break;
+        case "volunteering": data = await storage.getVolunteering(); break;
+        case "mentors": data = await storage.getMentors(); break;
+        case "groups": data = await storage.getGroups(); break;
+        case "mandals": data = await storage.getMandals(); break;
+        case "sabha_locations": data = await storage.getSabhaLocations(); break;
+        case "group_memberships": data = await storage.getGroupMemberships(); break;
+        case "dev_macros": data = await storage.getDevMacros(); break;
+        case "page_registry": data = await storage.getPageRegistry(); break;
+        case "schema_registry": data = await storage.getSchemaRegistry(); break;
+        case "route_registry": data = await storage.getRouteRegistry(); break;
+        case "audit_log": data = await storage.getAuditLog(1000); break;
+        case "users": data = await storage.getAllUsers(); break;
+        default: return res.status(400).json({ message: "Unknown table: " + table });
+      }
+      res.json(data);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ─── ENTITY IMPORT (CSV/JSON rows) ──────────────────────────────────────────
+  app.post('/api/admin/import/entity', isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const { table, rows } = req.body;
+      const userId = req.user?.claims?.sub || "system";
+      let imported = 0;
+      let errors: string[] = [];
+      for (const row of rows) {
+        try {
+          switch (table) {
+            case "devotees": {
+              const { id, created_at, updated_at, ...rest } = row;
+              await storage.createDevotee(rest);
+              break;
+            }
+            case "families": {
+              const { id, created_at, updated_at, ...rest } = row;
+              await storage.createFamily(rest);
+              break;
+            }
+            case "events": {
+              const { id, created_at, updated_at, ...rest } = row;
+              await storage.createEvent(rest);
+              break;
+            }
+            case "mentors": {
+              const { id, created_at, updated_at, ...rest } = row;
+              await storage.createMentor(rest);
+              break;
+            }
+            case "groups": {
+              const { id, created_at, updated_at, ...rest } = row;
+              await storage.createGroup(rest);
+              break;
+            }
+            case "mandals": {
+              const { id, created_at, ...rest } = row;
+              await storage.createMandal(rest);
+              break;
+            }
+            case "sabha_locations": {
+              const { id, created_at, ...rest } = row;
+              await storage.createSabhaLocation(rest);
+              break;
+            }
+            case "donations": {
+              const { id, created_at, ...rest } = row;
+              await storage.createDonation(rest);
+              break;
+            }
+            case "attendance": {
+              const { id, created_at, ...rest } = row;
+              await storage.createAttendance(rest);
+              break;
+            }
+            case "volunteering": {
+              const { id, created_at, ...rest } = row;
+              await storage.createVolunteering(rest);
+              break;
+            }
+            default:
+              errors.push("Unsupported table: " + table);
+              continue;
+          }
+          imported++;
+        } catch (err: any) {
+          errors.push(err.message || "Unknown error");
+        }
+      }
+      await addAudit("IMPORT_ENTITY", table, null, userId, null, { imported, errors: errors.length });
+      res.json({ imported, errors: errors.slice(0, 10), table });
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
