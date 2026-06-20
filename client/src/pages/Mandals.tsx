@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Search, Plus, Edit, Trash2, Eye, Landmark, Users, MapPin, CalendarDays, Heart, HandHeart, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 import type { Mandal, Devotee, Event, SabhaLocation } from "@shared/schema";
 
 export default function Mandals() {
@@ -23,6 +24,7 @@ export default function Mandals() {
   const [viewMandal, setViewMandal] = useState<Mandal | null>(null);
   const [formData, setFormData] = useState({ name: "", hindiName: "", code: "", description: "" });
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const queryClient = useQueryClient();
 
   const { data: mandals = [], isLoading } = useQuery<Mandal[]>({ queryKey: ["/api/mandals"] });
@@ -195,7 +197,7 @@ export default function Mandals() {
                   <h4 className="text-sm font-medium mb-2">Members</h4>
                   <div className="space-y-1">
                     {getMandalDevotees(viewMandal.name).map((d: Devotee) => (
-                      <div key={d.id} className="text-sm px-2 py-1 rounded bg-muted">{d.firstName} {d.lastName}</div>
+                      <div key={d.id} className="text-sm px-2 py-1 rounded bg-muted text-primary hover:underline cursor-pointer" onClick={() => navigate(`/devotees/${d.id}`)}>{d.firstName} {d.lastName}</div>
                     ))}
                   </div>
                 </div>

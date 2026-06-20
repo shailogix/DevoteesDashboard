@@ -198,7 +198,7 @@ export function DevoteeList() {
             </TableHeader>
             <TableBody>
               {filteredDevotees.map((devotee: Devotee) => (
-                <TableRow key={devotee.id}>
+                <TableRow key={devotee.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/devotees/${devotee.id}`)}>
                   <TableCell>
                     <div className="flex items-center space-x-3">
                       <Avatar>
@@ -208,7 +208,7 @@ export function DevoteeList() {
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="font-medium">
+                        <div className="font-medium text-primary hover:underline">
                           {devotee.firstName} {devotee.lastName}
                         </div>
                         <div className="text-sm text-muted-foreground">

@@ -167,13 +167,19 @@ export default function Families() {
                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-sm font-bold text-primary">
                               {family.familyName[0]}
                             </div>
-                            <span>{family.familyName}</span>
+                            <span className="text-primary hover:underline cursor-pointer" onClick={(e) => { e.stopPropagation(); navigate(`/families/${family.id}`); }}>{family.familyName}</span>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1.5">
                             <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                            <span className="text-sm">{getDevoteeName(family.headOfFamily as any)}</span>
+                            {family.headOfFamily ? (
+                              <span className="text-sm text-primary hover:underline cursor-pointer" onClick={(e) => { e.stopPropagation(); navigate(`/devotees/${family.headOfFamily}`); }}>
+                                {getDevoteeName(family.headOfFamily as any)}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">Not assigned</span>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>

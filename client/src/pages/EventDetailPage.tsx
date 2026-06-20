@@ -267,7 +267,7 @@ export default function EventDetailPage() {
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <div className="text-sm font-medium">{a.devoteeName || "Unknown"}</div>
+                            <div className="text-sm font-medium text-primary hover:underline cursor-pointer" onClick={() => a.devoteeId && navigate(`/devotees/${a.devoteeId}`)}>{a.devoteeName || "Unknown"}</div>
                             <div className="text-xs text-muted-foreground">
                               {a.checkInTime ? `Checked in: ${a.checkInTime}` : "No check-in time"}
                             </div>
@@ -310,7 +310,7 @@ export default function EventDetailPage() {
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <div className="text-sm font-medium">{d.devoteeName || "Anonymous"}</div>
+                            <div className="text-sm font-medium text-primary hover:underline cursor-pointer" onClick={() => d.devoteeId && navigate(`/devotees/${d.devoteeId}`)}>{d.devoteeName || "Anonymous"}</div>
                             <div className="text-xs text-muted-foreground">{d.donationType} · {d.paymentMethod}</div>
                           </div>
                         </div>
@@ -350,7 +350,7 @@ export default function EventDetailPage() {
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <div className="text-sm font-medium">{v.devoteeName || "Unknown"}</div>
+                            <div className="text-sm font-medium text-primary hover:underline cursor-pointer" onClick={() => v.devoteeId && navigate(`/devotees/${v.devoteeId}`)}>{v.devoteeName || "Unknown"}</div>
                             <div className="text-xs text-muted-foreground">{v.activityType}</div>
                           </div>
                         </div>

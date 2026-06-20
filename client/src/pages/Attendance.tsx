@@ -15,6 +15,7 @@ import { Progress } from "@/components/ui/progress";
 import { Calendar, Plus, CheckCircle, XCircle, Clock, AlertCircle, Users, TrendingUp, Award, Search, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 import type { Attendance, Devotee, Event } from "@shared/schema";
 
 type AttendanceRecord = Attendance & { devoteeName?: string; eventTitle?: string };
@@ -27,6 +28,7 @@ export default function AttendancePage() {
   const [newRecord, setNewRecord] = useState({ devoteeId: "", eventId: "", status: "present", checkInTime: "09:00", notes: "" });
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
 
   const { data: attendanceRaw = [], isLoading: attLoading } = useQuery<Attendance[]>({ queryKey: ["/api/attendance"] });
   const { data: devotees = [], isLoading: devLoading } = useQuery<Devotee[]>({ queryKey: ["/api/devotees"] });
@@ -259,7 +261,11 @@ export default function AttendancePage() {
                       <TableBody>
                         {filtered.map((record) => (
                           <TableRow key={record.id} className="group hover:bg-muted/30">
-                            <TableCell className="font-medium">{record.devoteeName}</TableCell>
+                            <TableCell className="font-medium">
+                              <span className="text-primary hover:underline cursor-pointer" onClick={() => navigate(`/devotees/${record.devoteeId}`)}>
+                                {record.devoteeName}
+                              </span>
+                            </TableCell>
                             <TableCell className="text-sm text-muted-foreground max-w-[180px]" title={record.eventTitle}><span className="block truncate" title={record.eventTitle}>{record.eventTitle}</span></TableCell>
                             <TableCell className="text-sm">
                               {record.attendanceDate ? new Date(record.attendanceDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
@@ -299,7 +305,7 @@ export default function AttendancePage() {
                         <span className={`text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center ${idx === 0 ? "bg-amber-100 text-amber-700" : idx === 1 ? "bg-gray-100 text-gray-600" : "bg-orange-50 text-orange-600"}`}>
                           {idx + 1}
                         </span>
-                        <span className="text-xs font-medium break-words max-w-[100px]" title={att.name}>{att.name}</span>
+                        <span className="text-xs font-medium break-words max-w-[100px] text-primary hover:underline cursor-pointer" title={att.name} onClick={() => navigate(`/devotees/${att.id}`)}>{att.name}</span>
                       </div>
                       <span className="text-xs text-muted-foreground">{att.present} times</span>
                     </div>
