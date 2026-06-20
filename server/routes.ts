@@ -1385,6 +1385,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ restored: true, slot, overrides: slot.overrides });
   });
 
+  // ─── ADMIN: PAGE REGISTRY ───────────────────────────────────────────────────
+  app.get('/api/admin/page-registry', isAuthenticated, async (_req, res) => {
+    try { res.json(await storage.getPageRegistry()); } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+  app.post('/api/admin/page-registry', isAuthenticated, requireGodMode, async (req, res) => {
+    try { const entry = await storage.createPageRegistryEntry(req.body); res.json(entry); } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+  app.get('/api/admin/page-registry/:id', isAuthenticated, async (req, res) => {
+    try {
+      const entry = await storage.getPageRegistryEntry(Number(req.params.id));
+      if (!entry) return res.status(404).json({ message: "Page not found" });
+      res.json(entry);
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+  app.put('/api/admin/page-registry/:id', isAuthenticated, requireGodMode, async (req, res) => {
+    try { const entry = await storage.updatePageRegistryEntry(Number(req.params.id), req.body); res.json(entry); } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+  app.delete('/api/admin/page-registry/:id', isAuthenticated, requireGodMode, async (req, res) => {
+    try { await storage.deletePageRegistryEntry(Number(req.params.id)); res.json({ deleted: true }); } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+
+  // ─── ADMIN: SCHEMA REGISTRY ─────────────────────────────────────────────────
+  app.get('/api/admin/schema-registry', isAuthenticated, async (_req, res) => {
+    try { res.json(await storage.getSchemaRegistry()); } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+  app.post('/api/admin/schema-registry', isAuthenticated, requireGodMode, async (req, res) => {
+    try { const entry = await storage.createSchemaRegistryEntry(req.body); res.json(entry); } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+  app.get('/api/admin/schema-registry/:id', isAuthenticated, async (req, res) => {
+    try {
+      const entry = await storage.getSchemaRegistryEntry(Number(req.params.id));
+      if (!entry) return res.status(404).json({ message: "Schema not found" });
+      res.json(entry);
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+  app.put('/api/admin/schema-registry/:id', isAuthenticated, requireGodMode, async (req, res) => {
+    try { const entry = await storage.updateSchemaRegistryEntry(Number(req.params.id), req.body); res.json(entry); } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+  app.delete('/api/admin/schema-registry/:id', isAuthenticated, requireGodMode, async (req, res) => {
+    try { await storage.deleteSchemaRegistryEntry(Number(req.params.id)); res.json({ deleted: true }); } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+
+  // ─── ADMIN: ROUTE REGISTRY ──────────────────────────────────────────────────
+  app.get('/api/admin/route-registry', isAuthenticated, async (_req, res) => {
+    try { res.json(await storage.getRouteRegistry()); } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+  app.post('/api/admin/route-registry', isAuthenticated, requireGodMode, async (req, res) => {
+    try { const entry = await storage.createRouteRegistryEntry(req.body); res.json(entry); } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+  app.get('/api/admin/route-registry/:id', isAuthenticated, async (req, res) => {
+    try {
+      const entry = await storage.getRouteRegistryEntry(Number(req.params.id));
+      if (!entry) return res.status(404).json({ message: "Route not found" });
+      res.json(entry);
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+  app.put('/api/admin/route-registry/:id', isAuthenticated, requireGodMode, async (req, res) => {
+    try { const entry = await storage.updateRouteRegistryEntry(Number(req.params.id), req.body); res.json(entry); } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+  app.delete('/api/admin/route-registry/:id', isAuthenticated, requireGodMode, async (req, res) => {
+    try { await storage.deleteRouteRegistryEntry(Number(req.params.id)); res.json({ deleted: true }); } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+
+  // ─── DYNAMIC ROUTE EXECUTION ────────────────────────────────────────────────
+  app.all('/api/dynamic/*', isAuthenticated, async (req, res) => {
+    try {
+      const allRoutes = await storage.getRouteRegistry();
+      const dynamicPath = req.path.replace('/api/dynamic', '');
+      const matched = allRoutes.find((r: any) => {
+        const pattern = r.path.replace(/\*/g, '.*').replace(/:(\w+)/g, '(\w+)');
+        const regex = new RegExp(`^${pattern}$`);
+        return regex.test(dynamicPath) && r.method.toUpperCase() === req.method.toUpperCase();
+      });
+      if (!matched) return res.status(404).json({ message: "Dynamic route not found" });
+      const { pool } = await import("./db");
+      let sql = matched.sqlQuery;
+      const params: any[] = [];
+      if (matched.parameters) {
+        for (const param of matched.parameters) {
+          const val = req.body[param.name] ?? req.query[param.name] ?? req.params[param.name];
+          if (param.required && val === undefined) {
+            return res.status(400).json({ message: `Missing required parameter: ${param.name}` });
+          }
+          sql = sql.replace(new RegExp(`:${param.name}\\b`, 'g'), `$${params.length + 1}`);
+          params.push(val);
+        }
+      }
+      const result = await pool.query(sql, params);
+      res.json({ data: result.rows });
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+
   // ─── ADMIN: SEED MANAGER ────────────────────────────────────────────────────
   app.get('/api/admin/seed/counts', isAuthenticated, async (_req, res) => {
     try {

@@ -16,7 +16,8 @@ import {
   Home, Users, Building, GraduationCap, Calendar, Heart,
   CalendarDays, HandHeart, BarChart3, Settings, CreditCard,
   LogOut, Code2, Layers, Sparkles, ChevronDown, ChevronRight,
-  Plus, Users2, Globe, BookOpen, Landmark, Leaf, Mountain, X
+  Plus, Users2, Globe, BookOpen, Landmark, Leaf, Mountain, X,
+  FileText
 } from "lucide-react";
 
 const ICON_MAP: Record<string, any> = {
@@ -182,6 +183,11 @@ export function Sidebar() {
     refetchOnWindowFocus: false,
   });
 
+  const { data: dynamicPages = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/page-registry"],
+    refetchOnWindowFocus: false,
+  });
+
   const appInfo = devConfig?.appInfo || {
     name: "Madhav Parivar",
     subtitle: "Database System",
@@ -331,6 +337,29 @@ export function Sidebar() {
             </div>
           )}
         </div>
+
+        {/* Dynamic pages */}
+        {dynamicPages.length > 0 && (
+          <>
+            <div className="pt-2 pb-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-4">
+                Dynamic Pages
+              </p>
+            </div>
+            {dynamicPages.map((page: any) => {
+              const href = `/page/${page.slug}`;
+              const Icon = ICON_MAP[page.icon] || FileText;
+              return (
+                <Link key={page.id} href={href}>
+                  <div className={getNavItemClass(href)} data-testid={`nav-link-dynamic-${page.slug}`}>
+                    <Icon className="w-5 h-5 flex-shrink-0" />
+                    <span className="break-words min-w-0">{page.label}</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </>
+        )}
 
         {/* Dev Studio link – only in dev mode */}
         {isDevMode && (

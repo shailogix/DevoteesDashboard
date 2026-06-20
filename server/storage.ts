@@ -20,6 +20,9 @@ import {
   auditLog,
   visualOverrides,
   rollbackSlots,
+  pageRegistry,
+  schemaRegistry,
+  routeRegistry,
   type User,
   type UpsertUser,
   type Devotee,
@@ -58,6 +61,12 @@ import {
   type InsertVisualOverride,
   type RollbackSlot,
   type InsertRollbackSlot,
+  type PageRegistryEntry,
+  type InsertPageRegistry,
+  type SchemaRegistryEntry,
+  type InsertSchemaRegistry,
+  type RouteRegistryEntry,
+  type InsertRouteRegistry,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, count, sum, sql } from "drizzle-orm";
@@ -162,6 +171,30 @@ export interface IStorage {
   getRollbackSlot(index: number): Promise<RollbackSlot | undefined>;
   createRollbackSlot(slot: InsertRollbackSlot): Promise<RollbackSlot>;
   deleteRollbackSlot(index: number): Promise<boolean>;
+
+  // Page Registry
+  getPageRegistry(): Promise<PageRegistryEntry[]>;
+  getPageRegistryEntry(id: number): Promise<PageRegistryEntry | undefined>;
+  getPageRegistryEntryBySlug(slug: string): Promise<PageRegistryEntry | undefined>;
+  createPageRegistryEntry(entry: InsertPageRegistry): Promise<PageRegistryEntry>;
+  updatePageRegistryEntry(id: number, entry: Partial<InsertPageRegistry>): Promise<PageRegistryEntry>;
+  deletePageRegistryEntry(id: number): Promise<boolean>;
+
+  // Schema Registry
+  getSchemaRegistry(): Promise<SchemaRegistryEntry[]>;
+  getSchemaRegistryEntry(id: number): Promise<SchemaRegistryEntry | undefined>;
+  getSchemaRegistryEntryByTableName(tableName: string): Promise<SchemaRegistryEntry | undefined>;
+  createSchemaRegistryEntry(entry: InsertSchemaRegistry): Promise<SchemaRegistryEntry>;
+  updateSchemaRegistryEntry(id: number, entry: Partial<InsertSchemaRegistry>): Promise<SchemaRegistryEntry>;
+  deleteSchemaRegistryEntry(id: number): Promise<boolean>;
+
+  // Route Registry
+  getRouteRegistry(): Promise<RouteRegistryEntry[]>;
+  getRouteRegistryEntry(id: number): Promise<RouteRegistryEntry | undefined>;
+  getRouteRegistryEntryByPath(path: string): Promise<RouteRegistryEntry | undefined>;
+  createRouteRegistryEntry(entry: InsertRouteRegistry): Promise<RouteRegistryEntry>;
+  updateRouteRegistryEntry(id: number, entry: Partial<InsertRouteRegistry>): Promise<RouteRegistryEntry>;
+  deleteRouteRegistryEntry(id: number): Promise<boolean>;
 
   getStats(): Promise<{
     totalDevotees: number;
@@ -758,6 +791,96 @@ export class DatabaseStorage implements IStorage {
     const result = await db.delete(rollbackSlots).where(eq(rollbackSlots.slotIndex, index));
     return (result.rowCount ?? 0) > 0;
   }
+
+  // ─── Page Registry ──────────────────────────────────────────────────
+  async getPageRegistry(): Promise<PageRegistryEntry[]> {
+    return await db.select().from(pageRegistry).where(eq(pageRegistry.isActive, true)).orderBy(pageRegistry.label);
+  }
+
+  async getPageRegistryEntry(id: number): Promise<PageRegistryEntry | undefined> {
+    const [entry] = await db.select().from(pageRegistry).where(eq(pageRegistry.id, id));
+    return entry;
+  }
+
+  async getPageRegistryEntryBySlug(slug: string): Promise<PageRegistryEntry | undefined> {
+    const [entry] = await db.select().from(pageRegistry).where(eq(pageRegistry.slug, slug));
+    return entry;
+  }
+
+  async createPageRegistryEntry(entry: InsertPageRegistry): Promise<PageRegistryEntry> {
+    const [newEntry] = await db.insert(pageRegistry).values(entry).returning();
+    return newEntry;
+  }
+
+  async updatePageRegistryEntry(id: number, entry: Partial<InsertPageRegistry>): Promise<PageRegistryEntry> {
+    const [updated] = await db.update(pageRegistry).set({ ...entry, updatedAt: new Date() }).where(eq(pageRegistry.id, id)).returning();
+    return updated;
+  }
+
+  async deletePageRegistryEntry(id: number): Promise<boolean> {
+    const result = await db.delete(pageRegistry).where(eq(pageRegistry.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // ─── Schema Registry ─────────────────────────────────────────
+  async getSchemaRegistry(): Promise<SchemaRegistryEntry[]> {
+    return await db.select().from(schemaRegistry).where(eq(schemaRegistry.isActive, true)).orderBy(schemaRegistry.label);
+  }
+
+  async getSchemaRegistryEntry(id: number): Promise<SchemaRegistryEntry | undefined> {
+    const [entry] = await db.select().from(schemaRegistry).where(eq(schemaRegistry.id, id));
+    return entry;
+  }
+
+  async getSchemaRegistryEntryByTableName(tableName: string): Promise<SchemaRegistryEntry | undefined> {
+    const [entry] = await db.select().from(schemaRegistry).where(eq(schemaRegistry.tableName, tableName));
+    return entry;
+  }
+
+  async createSchemaRegistryEntry(entry: InsertSchemaRegistry): Promise<SchemaRegistryEntry> {
+    const [newEntry] = await db.insert(schemaRegistry).values(entry).returning();
+    return newEntry;
+  }
+
+  async updateSchemaRegistryEntry(id: number, entry: Partial<InsertSchemaRegistry>): Promise<SchemaRegistryEntry> {
+    const [updated] = await db.update(schemaRegistry).set({ ...entry, updatedAt: new Date() }).where(eq(schemaRegistry.id, id)).returning();
+    return updated;
+  }
+
+  async deleteSchemaRegistryEntry(id: number): Promise<boolean> {
+    const result = await db.delete(schemaRegistry).where(eq(schemaRegistry.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // ─── Route Registry ────────────────────────────────────────────
+  async getRouteRegistry(): Promise<RouteRegistryEntry[]> {
+    return await db.select().from(routeRegistry).where(eq(routeRegistry.isActive, true)).orderBy(routeRegistry.label);
+  }
+
+  async getRouteRegistryEntry(id: number): Promise<RouteRegistryEntry | undefined> {
+    const [entry] = await db.select().from(routeRegistry).where(eq(routeRegistry.id, id));
+    return entry;
+  }
+
+  async getRouteRegistryEntryByPath(path: string): Promise<RouteRegistryEntry | undefined> {
+    const [entry] = await db.select().from(routeRegistry).where(eq(routeRegistry.path, path));
+    return entry;
+  }
+
+  async createRouteRegistryEntry(entry: InsertRouteRegistry): Promise<RouteRegistryEntry> {
+    const [newEntry] = await db.insert(routeRegistry).values(entry).returning();
+    return newEntry;
+  }
+
+  async updateRouteRegistryEntry(id: number, entry: Partial<InsertRouteRegistry>): Promise<RouteRegistryEntry> {
+    const [updated] = await db.update(routeRegistry).set(entry).where(eq(routeRegistry.id, id)).returning();
+    return updated;
+  }
+
+  async deleteRouteRegistryEntry(id: number): Promise<boolean> {
+    const result = await db.delete(routeRegistry).where(eq(routeRegistry.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
 }
 
 import { MemoryStorage } from "./memoryStorage";
@@ -893,6 +1016,30 @@ class FallbackStorage implements IStorage {
   async getRollbackSlot(index: number) { return this.executeWithFallback(s => s.getRollbackSlot(index)); }
   async createRollbackSlot(slot: InsertRollbackSlot) { return this.executeWithFallback(s => s.createRollbackSlot(slot)); }
   async deleteRollbackSlot(index: number) { return this.executeWithFallback(s => s.deleteRollbackSlot(index)); }
+
+  // Page Registry
+  async getPageRegistry() { return this.executeWithFallback(s => s.getPageRegistry()); }
+  async getPageRegistryEntry(id: number) { return this.executeWithFallback(s => s.getPageRegistryEntry(id)); }
+  async getPageRegistryEntryBySlug(slug: string) { return this.executeWithFallback(s => s.getPageRegistryEntryBySlug(slug)); }
+  async createPageRegistryEntry(entry: InsertPageRegistry) { return this.executeWithFallback(s => s.createPageRegistryEntry(entry)); }
+  async updatePageRegistryEntry(id: number, entry: Partial<InsertPageRegistry>) { return this.executeWithFallback(s => s.updatePageRegistryEntry(id, entry)); }
+  async deletePageRegistryEntry(id: number) { return this.executeWithFallback(s => s.deletePageRegistryEntry(id)); }
+
+  // Schema Registry
+  async getSchemaRegistry() { return this.executeWithFallback(s => s.getSchemaRegistry()); }
+  async getSchemaRegistryEntry(id: number) { return this.executeWithFallback(s => s.getSchemaRegistryEntry(id)); }
+  async getSchemaRegistryEntryByTableName(tableName: string) { return this.executeWithFallback(s => s.getSchemaRegistryEntryByTableName(tableName)); }
+  async createSchemaRegistryEntry(entry: InsertSchemaRegistry) { return this.executeWithFallback(s => s.createSchemaRegistryEntry(entry)); }
+  async updateSchemaRegistryEntry(id: number, entry: Partial<InsertSchemaRegistry>) { return this.executeWithFallback(s => s.updateSchemaRegistryEntry(id, entry)); }
+  async deleteSchemaRegistryEntry(id: number) { return this.executeWithFallback(s => s.deleteSchemaRegistryEntry(id)); }
+
+  // Route Registry
+  async getRouteRegistry() { return this.executeWithFallback(s => s.getRouteRegistry()); }
+  async getRouteRegistryEntry(id: number) { return this.executeWithFallback(s => s.getRouteRegistryEntry(id)); }
+  async getRouteRegistryEntryByPath(path: string) { return this.executeWithFallback(s => s.getRouteRegistryEntryByPath(path)); }
+  async createRouteRegistryEntry(entry: InsertRouteRegistry) { return this.executeWithFallback(s => s.createRouteRegistryEntry(entry)); }
+  async updateRouteRegistryEntry(id: number, entry: Partial<InsertRouteRegistry>) { return this.executeWithFallback(s => s.updateRouteRegistryEntry(id, entry)); }
+  async deleteRouteRegistryEntry(id: number) { return this.executeWithFallback(s => s.deleteRouteRegistryEntry(id)); }
 }
 
 export const storage = new FallbackStorage();

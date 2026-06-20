@@ -31,6 +31,7 @@ import IDCardGenerator from "@/pages/IDCardGenerator";
 import DevoteeProfilePage from "@/pages/DevoteeProfilePage";
 import DevStudio from "@/pages/DevStudio";
 import DashboardDesigner from "@/components/Dashboard/DashboardDesigner";
+import DynamicPage from "@/pages/DynamicPage";
 
 function EditModeCursor() {
   const { isEditMode } = useVisualEditor();
@@ -89,6 +90,7 @@ function AppContent() {
             <Route path="/devotees/:id" component={DevoteeProfilePage} />
             <Route path="/id-cards" component={IDCardGenerator} />
             <Route path="/settings" component={Settings} />
+            <Route path="/page/:slug" component={DynamicPage} />
             <Route component={NotFound} />
           </Switch>
         </div>

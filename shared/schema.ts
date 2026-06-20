@@ -314,6 +314,50 @@ export const rollbackSlots = pgTable("rollback_slots", {
   savedAt: timestamp("saved_at").defaultNow(),
 });
 
+// Page Registry storage table (dynamic pages)
+export const pageRegistry = pgTable("page_registry", {
+  id: serial("id").primaryKey(),
+  slug: varchar("slug", { length: 100 }).unique().notNull(),
+  label: varchar("label", { length: 255 }).notNull(),
+  description: text("description"),
+  icon: varchar("icon", { length: 50 }),
+  sections: jsonb("sections").notNull(),
+  dataSource: varchar("data_source", { length: 100 }),
+  filters: jsonb("filters"),
+  permissions: jsonb("permissions"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Schema Registry storage table (dynamic database schemas)
+export const schemaRegistry = pgTable("schema_registry", {
+  id: serial("id").primaryKey(),
+  tableName: varchar("table_name", { length: 100 }).unique().notNull(),
+  label: varchar("label", { length: 255 }).notNull(),
+  description: text("description"),
+  fields: jsonb("fields").notNull(),
+  relations: jsonb("relations"),
+  displayColumns: jsonb("display_columns"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Route Registry storage table (dynamic API routes)
+export const routeRegistry = pgTable("route_registry", {
+  id: serial("id").primaryKey(),
+  method: varchar("method", { length: 10 }).notNull(),
+  path: varchar("path", { length: 255 }).notNull(),
+  label: varchar("label", { length: 255 }),
+  description: text("description"),
+  sqlQuery: text("sql_query").notNull(),
+  parameters: jsonb("parameters"),
+  requiredRole: varchar("required_role", { length: 50 }).default("user"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // User Preferences storage table
 export const userPreferences = pgTable("user_preferences", {
   id: serial("id").primaryKey(),
@@ -452,6 +496,9 @@ export const devMacrosRelations = relations(devMacros, ({}) => ({}));
 export const auditLogRelations = relations(auditLog, ({}) => ({}));
 export const visualOverridesRelations = relations(visualOverrides, ({}) => ({}));
 export const rollbackSlotsRelations = relations(rollbackSlots, ({}) => ({}));
+export const pageRegistryRelations = relations(pageRegistry, ({}) => ({}));
+export const schemaRegistryRelations = relations(schemaRegistry, ({}) => ({}));
+export const routeRegistryRelations = relations(routeRegistry, ({}) => ({}));
 
 // Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -564,6 +611,23 @@ export const insertRollbackSlotSchema = createInsertSchema(rollbackSlots).omit({
   savedAt: true,
 });
 
+export const insertPageRegistrySchema = createInsertSchema(pageRegistry).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSchemaRegistrySchema = createInsertSchema(schemaRegistry).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRouteRegistrySchema = createInsertSchema(routeRegistry).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -621,6 +685,15 @@ export type VisualOverride = typeof visualOverrides.$inferSelect;
 
 export type InsertRollbackSlot = z.infer<typeof insertRollbackSlotSchema>;
 export type RollbackSlot = typeof rollbackSlots.$inferSelect;
+
+export type InsertPageRegistry = z.infer<typeof insertPageRegistrySchema>;
+export type PageRegistryEntry = typeof pageRegistry.$inferSelect;
+
+export type InsertSchemaRegistry = z.infer<typeof insertSchemaRegistrySchema>;
+export type SchemaRegistryEntry = typeof schemaRegistry.$inferSelect;
+
+export type InsertRouteRegistry = z.infer<typeof insertRouteRegistrySchema>;
+export type RouteRegistryEntry = typeof routeRegistry.$inferSelect;
 
 // ─── Notification (in-memory only, not persisted in DB) ──────────────────────
 export const notificationSchema = z.object({

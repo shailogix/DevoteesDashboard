@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -1638,6 +1639,243 @@ function VisualOverridesPanel() {
   );
 }
 
+// ─── PAGE BUILDER PANEL ──────────────────────────────────────────────────────
+function PageBuilderPanel() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [newPage, setNewPage] = useState({ slug: "", label: "", description: "", icon: "Home", dataSource: "", sections: [{ type: "table", title: "Records", config: {} }] });
+
+  const { data: pages = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/admin/page-registry"] });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/admin/page-registry", data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/page-registry"] }); toast({ title: "Page created" }); setNewPage({ slug: "", label: "", description: "", icon: "Home", dataSource: "", sections: [{ type: "table", title: "Records", config: {} }] }); },
+    onError: () => toast({ title: "Failed to create page", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/admin/page-registry/${id}`, undefined),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/page-registry"] }); toast({ title: "Page deleted" }); },
+  });
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2 space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Layers className="w-5 h-5 text-primary" /> Dynamic Pages</CardTitle>
+            <CardDescription>Pages created here appear in the sidebar and render dynamically without code.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <div className="space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></div> : (
+              <div className="space-y-2">
+                {pages.length === 0 && <p className="text-sm text-muted-foreground">No dynamic pages yet. Create one below.</p>}
+                {pages.map((p: any) => (
+                  <div key={p.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                    <div>
+                      <div className="font-medium">{p.label}</div>
+                      <div className="text-xs text-muted-foreground">/page/{p.slug} · {p.dataSource || "No data source"}</div>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(p.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+      <div>
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Create New Page</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <Input placeholder="Page label" value={newPage.label} onChange={e => setNewPage({ ...newPage, label: e.target.value })} />
+            <Input placeholder="URL slug (e.g. mandals)" value={newPage.slug} onChange={e => setNewPage({ ...newPage, slug: e.target.value })} />
+            <Input placeholder="Description" value={newPage.description} onChange={e => setNewPage({ ...newPage, description: e.target.value })} />
+            <Select value={newPage.dataSource} onValueChange={v => setNewPage({ ...newPage, dataSource: v })}>
+              <SelectTrigger><SelectValue placeholder="Data source" /></SelectTrigger>
+              <SelectContent>
+                {ENTITIES.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                <SelectItem value="">None (custom)</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={newPage.icon} onValueChange={v => setNewPage({ ...newPage, icon: v })}>
+              <SelectTrigger><SelectValue placeholder="Icon" /></SelectTrigger>
+              <SelectContent>
+                {ICON_OPTIONS.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button className="w-full" onClick={() => createMutation.mutate(newPage)} disabled={!newPage.label || !newPage.slug || createMutation.isPending}>
+              {createMutation.isPending ? "Creating..." : "Create Page"}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ─── SCHEMA BUILDER PANEL ─────────────────────────────────────────────────
+function SchemaBuilderPanel() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [newSchema, setNewSchema] = useState({ tableName: "", label: "", description: "", fields: [{ name: "", type: "text", label: "", required: false }] });
+
+  const { data: schemas = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/admin/schema-registry"] });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/admin/schema-registry", data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/schema-registry"] }); toast({ title: "Schema created" }); setNewSchema({ tableName: "", label: "", description: "", fields: [{ name: "", type: "text", label: "", required: false }] }); },
+    onError: () => toast({ title: "Failed to create schema", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/admin/schema-registry/${id}`, undefined),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/schema-registry"] }); toast({ title: "Schema deleted" }); },
+  });
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2 space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Table className="w-5 h-5 text-primary" /> Dynamic Schemas</CardTitle>
+            <CardDescription>Schema definitions stored in the database. Future: auto-generate tables and CRUD from these.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <div className="space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></div> : (
+              <div className="space-y-2">
+                {schemas.length === 0 && <p className="text-sm text-muted-foreground">No custom schemas yet. Create one below.</p>}
+                {schemas.map((s: any) => (
+                  <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                    <div>
+                      <div className="font-medium">{s.label}</div>
+                      <div className="text-xs text-muted-foreground">Table: {s.tableName} · {s.fields?.length || 0} fields</div>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(s.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+      <div>
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Create New Schema</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <Input placeholder="Table name (e.g. sabha_centers)" value={newSchema.tableName} onChange={e => setNewSchema({ ...newSchema, tableName: e.target.value })} />
+            <Input placeholder="Display label" value={newSchema.label} onChange={e => setNewSchema({ ...newSchema, label: e.target.value })} />
+            <Input placeholder="Description" value={newSchema.description} onChange={e => setNewSchema({ ...newSchema, description: e.target.value })} />
+            <div className="space-y-2">
+              <Label className="text-xs">Fields</Label>
+              {newSchema.fields.map((f, idx) => (
+                <div key={idx} className="grid grid-cols-3 gap-2">
+                  <Input placeholder="Name" value={f.name} onChange={e => { const nf = [...newSchema.fields]; nf[idx].name = e.target.value; setNewSchema({ ...newSchema, fields: nf }); }} className="text-xs" />
+                  <Select value={f.type} onValueChange={v => { const nf = [...newSchema.fields]; nf[idx].type = v; setNewSchema({ ...newSchema, fields: nf }); }}>
+                    <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {FIELD_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Input placeholder="Label" value={f.label} onChange={e => { const nf = [...newSchema.fields]; nf[idx].label = e.target.value; setNewSchema({ ...newSchema, fields: nf }); }} className="text-xs" />
+                </div>
+              ))}
+              <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => setNewSchema({ ...newSchema, fields: [...newSchema.fields, { name: "", type: "text", label: "", required: false }] })}>
+                <Plus className="w-3 h-3 mr-1" /> Add Field
+              </Button>
+            </div>
+            <Button className="w-full" onClick={() => createMutation.mutate(newSchema)} disabled={!newSchema.tableName || !newSchema.label || createMutation.isPending}>
+              {createMutation.isPending ? "Creating..." : "Create Schema"}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ─── API BUILDER PANEL ────────────────────────────────────────────────────────
+function ApiBuilderPanel() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [newRoute, setNewRoute] = useState({ label: "", method: "GET", path: "", description: "", sqlQuery: "", requiredRole: "user" });
+
+  const { data: routes = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/admin/route-registry"] });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/admin/route-registry", data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/route-registry"] }); toast({ title: "Route created" }); setNewRoute({ label: "", method: "GET", path: "", description: "", sqlQuery: "", requiredRole: "user" }); },
+    onError: () => toast({ title: "Failed to create route", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/admin/route-registry/${id}`, undefined),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/route-registry"] }); toast({ title: "Route deleted" }); },
+  });
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2 space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Terminal className="w-5 h-5 text-primary" /> Dynamic API Routes</CardTitle>
+            <CardDescription>Custom REST endpoints defined in the database. Access via /api/dynamic/your-path.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <div className="space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></div> : (
+              <div className="space-y-2">
+                {routes.length === 0 && <p className="text-sm text-muted-foreground">No custom routes yet. Create one below.</p>}
+                {routes.map((r: any) => (
+                  <div key={r.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                    <div>
+                      <div className="font-medium flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px]">{r.method}</Badge>
+                        {r.label || r.path}
+                      </div>
+                      <div className="text-xs text-muted-foreground">{r.path} · Role: {r.requiredRole}</div>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(r.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+      <div>
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Create New Route</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <Input placeholder="Label (e.g. Top Donors)" value={newRoute.label} onChange={e => setNewRoute({ ...newRoute, label: e.target.value })} />
+            <div className="grid grid-cols-2 gap-2">
+              <Select value={newRoute.method} onValueChange={v => setNewRoute({ ...newRoute, method: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GET">GET</SelectItem>
+                  <SelectItem value="POST">POST</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={newRoute.requiredRole} onValueChange={v => setNewRoute({ ...newRoute, requiredRole: v })}>
+                <SelectTrigger><SelectValue placeholder="Role" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Input placeholder="Path (e.g. /top-donors)" value={newRoute.path} onChange={e => setNewRoute({ ...newRoute, path: e.target.value })} />
+            <Input placeholder="Description" value={newRoute.description} onChange={e => setNewRoute({ ...newRoute, description: e.target.value })} />
+            <Textarea placeholder="SQL query (e.g. SELECT * FROM devotees WHERE amount > 1000)" value={newRoute.sqlQuery} onChange={e => setNewRoute({ ...newRoute, sqlQuery: e.target.value })} className="min-h-[100px] text-xs font-mono" />
+            <Button className="w-full" onClick={() => createMutation.mutate(newRoute)} disabled={!newRoute.path || !newRoute.sqlQuery || createMutation.isPending}>
+              {createMutation.isPending ? "Creating..." : "Create Route"}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 export default function DevStudio() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -1802,6 +2040,9 @@ export default function DevStudio() {
     { id: "navigation", label: "Navigation", icon: Navigation },
     { id: "fields", label: "Schema", icon: Database },
     { id: "roles", label: "Access Control", icon: Shield },
+    { id: "page-builder", label: "Page Builder", icon: Layers },
+    { id: "schema-builder", label: "Schema Builder", icon: Table },
+    { id: "api-builder", label: "API Builder", icon: Terminal },
   ];
 
   const TAB_ROW2 = [
@@ -1837,7 +2078,7 @@ export default function DevStudio() {
           {/* Three-row tab layout for 15 tabs */}
           <div className="space-y-1 mb-5">
             <div className="text-xs text-muted-foreground px-1 mb-1 font-medium tracking-wider">CONFIGURATION</div>
-            <TabsList className="grid grid-cols-5 w-full bg-muted/60">
+            <TabsList className="grid grid-cols-8 w-full bg-muted/60">
               {TAB_ROW1.map(({ id, label, icon: Icon }) => (
                 <TabsTrigger key={id} value={id} className="flex items-center gap-1.5 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm">
                   <Icon className="w-3.5 h-3.5" /> {label}
@@ -2385,6 +2626,21 @@ export default function DevStudio() {
           {/* ── GOD MODE POWER: VISUAL OVERRIDES ── */}
           <TabsContent value="visual-overrides">
             <VisualOverridesPanel />
+          </TabsContent>
+
+          {/* ── PAGE BUILDER ── */}
+          <TabsContent value="page-builder">
+            <PageBuilderPanel />
+          </TabsContent>
+
+          {/* ── SCHEMA BUILDER ── */}
+          <TabsContent value="schema-builder">
+            <SchemaBuilderPanel />
+          </TabsContent>
+
+          {/* ── API BUILDER ── */}
+          <TabsContent value="api-builder">
+            <ApiBuilderPanel />
           </TabsContent>
         </Tabs>
       </main>

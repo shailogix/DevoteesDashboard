@@ -1270,4 +1270,94 @@ export class MemoryStorage implements IStorage {
     this.rollbackSlots = this.rollbackSlots.filter((s: any) => s.slotIndex !== index);
     return this.rollbackSlots.length < before;
   }
+
+  // ─── Page Registry (in-memory fallback) ──────────────────────────────
+  private pageRegistryStore = new Map<number, any>();
+  private pageRegistryCounter = 1;
+
+  async getPageRegistry(): Promise<any[]> {
+    return Array.from(this.pageRegistryStore.values()).filter((p: any) => p.isActive !== false);
+  }
+  async getPageRegistryEntry(id: number): Promise<any | undefined> {
+    return this.pageRegistryStore.get(id);
+  }
+  async getPageRegistryEntryBySlug(slug: string): Promise<any | undefined> {
+    return Array.from(this.pageRegistryStore.values()).find((p: any) => p.slug === slug);
+  }
+  async createPageRegistryEntry(entry: any): Promise<any> {
+    const id = this.pageRegistryCounter++;
+    const newEntry = { id, ...entry, isActive: true, createdAt: new Date(), updatedAt: new Date() };
+    this.pageRegistryStore.set(id, newEntry);
+    return newEntry;
+  }
+  async updatePageRegistryEntry(id: number, entry: any): Promise<any> {
+    const existing = this.pageRegistryStore.get(id);
+    if (!existing) throw new Error("Page registry entry not found");
+    const updated = { ...existing, ...entry, updatedAt: new Date() };
+    this.pageRegistryStore.set(id, updated);
+    return updated;
+  }
+  async deletePageRegistryEntry(id: number): Promise<boolean> {
+    return this.pageRegistryStore.delete(id);
+  }
+
+  // ─── Schema Registry (in-memory fallback) ──────────────────────────
+  private schemaRegistryStore = new Map<number, any>();
+  private schemaRegistryCounter = 1;
+
+  async getSchemaRegistry(): Promise<any[]> {
+    return Array.from(this.schemaRegistryStore.values()).filter((s: any) => s.isActive !== false);
+  }
+  async getSchemaRegistryEntry(id: number): Promise<any | undefined> {
+    return this.schemaRegistryStore.get(id);
+  }
+  async getSchemaRegistryEntryByTableName(tableName: string): Promise<any | undefined> {
+    return Array.from(this.schemaRegistryStore.values()).find((s: any) => s.tableName === tableName);
+  }
+  async createSchemaRegistryEntry(entry: any): Promise<any> {
+    const id = this.schemaRegistryCounter++;
+    const newEntry = { id, ...entry, isActive: true, createdAt: new Date(), updatedAt: new Date() };
+    this.schemaRegistryStore.set(id, newEntry);
+    return newEntry;
+  }
+  async updateSchemaRegistryEntry(id: number, entry: any): Promise<any> {
+    const existing = this.schemaRegistryStore.get(id);
+    if (!existing) throw new Error("Schema registry entry not found");
+    const updated = { ...existing, ...entry, updatedAt: new Date() };
+    this.schemaRegistryStore.set(id, updated);
+    return updated;
+  }
+  async deleteSchemaRegistryEntry(id: number): Promise<boolean> {
+    return this.schemaRegistryStore.delete(id);
+  }
+
+  // ─── Route Registry (in-memory fallback) ─────────────────────────────
+  private routeRegistryStore = new Map<number, any>();
+  private routeRegistryCounter = 1;
+
+  async getRouteRegistry(): Promise<any[]> {
+    return Array.from(this.routeRegistryStore.values()).filter((r: any) => r.isActive !== false);
+  }
+  async getRouteRegistryEntry(id: number): Promise<any | undefined> {
+    return this.routeRegistryStore.get(id);
+  }
+  async getRouteRegistryEntryByPath(path: string): Promise<any | undefined> {
+    return Array.from(this.routeRegistryStore.values()).find((r: any) => r.path === path);
+  }
+  async createRouteRegistryEntry(entry: any): Promise<any> {
+    const id = this.routeRegistryCounter++;
+    const newEntry = { id, ...entry, isActive: true, createdAt: new Date() };
+    this.routeRegistryStore.set(id, newEntry);
+    return newEntry;
+  }
+  async updateRouteRegistryEntry(id: number, entry: any): Promise<any> {
+    const existing = this.routeRegistryStore.get(id);
+    if (!existing) throw new Error("Route registry entry not found");
+    const updated = { ...existing, ...entry };
+    this.routeRegistryStore.set(id, updated);
+    return updated;
+  }
+  async deleteRouteRegistryEntry(id: number): Promise<boolean> {
+    return this.routeRegistryStore.delete(id);
+  }
 }
