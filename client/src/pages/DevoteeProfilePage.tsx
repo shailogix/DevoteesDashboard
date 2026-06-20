@@ -18,7 +18,6 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { adminFetch } from "@/contexts/DevModeContext";
-import { useDevMode } from "@/contexts/DevModeContext";
 import { useToast } from "@/hooks/use-toast";
 import { 
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
@@ -54,7 +53,6 @@ export default function DevoteeProfilePage() {
   const id = params?.id ? parseInt(params.id) : null;
   const { toast } = useToast();
   const qc = useQueryClient();
-  const { isDevMode } = useDevMode();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [docType, setDocType] = useState("Aadhaar Card");
 
@@ -647,33 +645,32 @@ export default function DevoteeProfilePage() {
           {/* ── DOCUMENTS TAB ───────────────────────────────────────────── */}
           <TabsContent value="documents" className="mt-6 space-y-6">
             {/* Upload panel — admin/dev mode only */}
-            {isDevMode ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Upload className="w-4 h-4" /> Upload Document
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-3 items-end">
-                    <div className="space-y-1.5">
-                      <p className="text-xs text-muted-foreground">Document Type</p>
-                      <Select value={docType} onValueChange={setDocType}>
-                        <SelectTrigger className="w-48">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Aadhaar Card">Aadhaar Card</SelectItem>
-                          <SelectItem value="PAN Card">PAN Card</SelectItem>
-                          <SelectItem value="Passport">Passport</SelectItem>
-                          <SelectItem value="Voter ID">Voter ID</SelectItem>
-                          <SelectItem value="Driving Licence">Driving Licence</SelectItem>
-                          <SelectItem value="Photo">Photo</SelectItem>
-                          <SelectItem value="Certificate">Certificate</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Upload className="w-4 h-4" /> Upload Document
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-3 items-end">
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">Document Type</p>
+                    <Select value={docType} onValueChange={setDocType}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Aadhaar Card">Aadhaar Card</SelectItem>
+                        <SelectItem value="PAN Card">PAN Card</SelectItem>
+                        <SelectItem value="Passport">Passport</SelectItem>
+                        <SelectItem value="Voter ID">Voter ID</SelectItem>
+                        <SelectItem value="Driving Licence">Driving Licence</SelectItem>
+                        <SelectItem value="Photo">Photo</SelectItem>
+                        <SelectItem value="Certificate">Certificate</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -693,12 +690,6 @@ export default function DevoteeProfilePage() {
                   </div>
                 </CardContent>
               </Card>
-            ) : (
-              <div className="flex items-center gap-2 p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                Document upload and management requires Developer (Admin) access. Contact your administrator.
-              </div>
-            )}
 
             {/* Document list */}
             <Card>
@@ -747,17 +738,15 @@ export default function DevoteeProfilePage() {
                           >
                             <Download className="w-4 h-4 text-blue-600" />
                           </Button>
-                          {isDevMode && (
-                            <Button
-                              variant="ghost" size="sm"
-                              onClick={() => deleteDocMutation.mutate(doc.id)}
-                              disabled={deleteDocMutation.isPending}
-                              className="text-destructive hover:text-destructive"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost" size="sm"
+                            onClick={() => deleteDocMutation.mutate(doc.id)}
+                            disabled={deleteDocMutation.isPending}
+                            className="text-destructive hover:text-destructive"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       </div>
                     ))}

@@ -214,7 +214,7 @@ export function IDCardGenerator({ devotees, onGenerate }: IDCardGeneratorProps) 
             <Download className="w-4 h-4 mr-2" />
             Generate ID Cards
           </Button>
-          <Button variant="outline" onClick={() => {}}>
+          <Button variant="outline" onClick={() => onGenerate(settings)}>
             <Eye className="w-4 h-4 mr-2" />
             Preview
           </Button>

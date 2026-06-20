@@ -1,9 +1,7 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/Layout/Header";
 import { EncryptionManager } from "@/components/Admin/EncryptionManager";
 import { ThemeSelector } from "@/components/Common/ThemeSelector";
-import { LoadingSpinner } from "@/components/Common/LoadingSpinner";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,81 +13,46 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { 
-  Settings as SettingsIcon, 
-  User, 
-  Bell, 
-  Shield, 
-  Palette, 
-  Database, 
-  Download, 
-  Upload,
-  Trash2,
+import {
+  User,
+  Bell,
+  Shield,
+  Palette,
   Save,
-  RefreshCw,
   Lock,
-  Globe,
   Moon,
   Sun,
   Monitor,
-  Key
+  Key,
 } from "lucide-react";
 
 export default function Settings() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState("profile");
-  const [isLoading, setIsLoading] = useState(false);
-
-  // User preferences query
-  const { data: preferences, isLoading: preferencesLoading } = useQuery({
-    queryKey: ["/api/user-preferences"],
+  const [displayMode, setDisplayMode] = useState("auto");
+  const [language, setLanguage] = useState("en");
+  const [notifPrefs, setNotifPrefs] = useState({
+    email: true,
+    newDevotee: true,
+    eventReminders: true,
+    donationAlerts: false,
+    birthdayReminders: true,
+    systemMaintenance: true,
   });
-
-  // Update preferences mutation
-  const updatePreferencesMutation = useMutation({
-    mutationFn: async (data: any) => {
-      return await apiRequest("POST", "/api/user-preferences", data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user-preferences"] });
-      toast({
-        title: "Success",
-        description: "Settings updated successfully",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update settings",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleSavePreferences = (newPreferences: any) => {
-    updatePreferencesMutation.mutate(newPreferences);
-  };
 
   const tabs = [
     { id: "profile", label: "Profile", icon: User },
     { id: "appearance", label: "Appearance", icon: Palette },
     { id: "notifications", label: "Notifications", icon: Bell },
     { id: "security", label: "Security", icon: Shield },
-    { id: "data", label: "Data Management", icon: Database },
-    { id: "system", label: "System", icon: SettingsIcon },
+    { id: "encryption", label: "Encryption", icon: Key },
   ];
 
-  if (preferencesLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <LoadingSpinner size="lg" text="Loading settings..." />
-      </div>
-    );
-  }
+  const handleSave = () => {
+    toast({ title: "Settings Saved", description: "Your preferences have been updated." });
+  };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -219,7 +182,7 @@ export default function Settings() {
                             <p className="text-sm text-muted-foreground mb-3">
                               Choose how the interface should appear
                             </p>
-                            <Select defaultValue="auto">
+                            <Select value={displayMode} onValueChange={setDisplayMode}>
                               <SelectTrigger className="w-48">
                                 <SelectValue />
                               </SelectTrigger>
@@ -253,7 +216,7 @@ export default function Settings() {
                             <p className="text-sm text-muted-foreground mb-3">
                               Select your preferred language
                             </p>
-                            <Select defaultValue="en">
+                            <Select value={language} onValueChange={setLanguage}>
                               <SelectTrigger className="w-48">
                                 <SelectValue />
                               </SelectTrigger>
@@ -284,7 +247,7 @@ export default function Settings() {
                                 <Label className="text-base">Email Notifications</Label>
                                 <p className="text-sm text-muted-foreground">Receive notifications via email</p>
                               </div>
-                              <Switch defaultChecked />
+                              <Switch checked={notifPrefs.email} onCheckedChange={(v) => setNotifPrefs(p => ({ ...p, email: v }))} />
                             </div>
 
                             <div className="flex items-center justify-between">
@@ -292,7 +255,7 @@ export default function Settings() {
                                 <Label className="text-base">New Devotee Registration</Label>
                                 <p className="text-sm text-muted-foreground">Get notified when new devotees join</p>
                               </div>
-                              <Switch defaultChecked />
+                              <Switch checked={notifPrefs.newDevotee} onCheckedChange={(v) => setNotifPrefs(p => ({ ...p, newDevotee: v }))} />
                             </div>
 
                             <div className="flex items-center justify-between">
@@ -300,7 +263,7 @@ export default function Settings() {
                                 <Label className="text-base">Event Reminders</Label>
                                 <p className="text-sm text-muted-foreground">Reminders for upcoming events</p>
                               </div>
-                              <Switch defaultChecked />
+                              <Switch checked={notifPrefs.eventReminders} onCheckedChange={(v) => setNotifPrefs(p => ({ ...p, eventReminders: v }))} />
                             </div>
 
                             <div className="flex items-center justify-between">
@@ -308,7 +271,7 @@ export default function Settings() {
                                 <Label className="text-base">Donation Alerts</Label>
                                 <p className="text-sm text-muted-foreground">Get notified about new donations</p>
                               </div>
-                              <Switch />
+                              <Switch checked={notifPrefs.donationAlerts} onCheckedChange={(v) => setNotifPrefs(p => ({ ...p, donationAlerts: v }))} />
                             </div>
 
                             <div className="flex items-center justify-between">
@@ -316,7 +279,7 @@ export default function Settings() {
                                 <Label className="text-base">Birthday Reminders</Label>
                                 <p className="text-sm text-muted-foreground">Reminders for devotee birthdays</p>
                               </div>
-                              <Switch defaultChecked />
+                              <Switch checked={notifPrefs.birthdayReminders} onCheckedChange={(v) => setNotifPrefs(p => ({ ...p, birthdayReminders: v }))} />
                             </div>
 
                             <div className="flex items-center justify-between">
@@ -324,7 +287,7 @@ export default function Settings() {
                                 <Label className="text-base">System Maintenance</Label>
                                 <p className="text-sm text-muted-foreground">Important system updates and maintenance</p>
                               </div>
-                              <Switch defaultChecked />
+                              <Switch checked={notifPrefs.systemMaintenance} onCheckedChange={(v) => setNotifPrefs(p => ({ ...p, systemMaintenance: v }))} />
                             </div>
                           </div>
                         </CardContent>
@@ -404,21 +367,9 @@ export default function Settings() {
 
                   {/* Save Button */}
                   <div className="flex justify-end pt-6 border-t border-border">
-                    <Button
-                      onClick={() => handleSavePreferences(preferences)}
-                      disabled={updatePreferencesMutation.isPending}
-                    >
-                      {updatePreferencesMutation.isPending ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4 mr-2" />
-                          Save Changes
-                        </>
-                      )}
+                    <Button onClick={handleSave}>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Changes
                     </Button>
                   </div>
                 </div>

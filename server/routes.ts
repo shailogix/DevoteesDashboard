@@ -1033,16 +1033,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Users management routes (admin/manager)
-  app.get('/api/users', isAuthenticated, async (req, res) => {
-    try {
-      const ms = (storage as any).memStore as MemoryStorage;
-      const users = ms.getAllUsers ? ms.getAllUsers() : [];
-      res.json(users);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch users" });
-    }
-  });
+  // Users management routes (admin/manager) — removed duplicate GET /api/users; the canonical route is above at line 64
 
   app.put('/api/users/:id', isAuthenticated, async (req, res) => {
     try {

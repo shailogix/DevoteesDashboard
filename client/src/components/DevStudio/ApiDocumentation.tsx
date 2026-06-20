@@ -108,13 +108,8 @@ const API_ENDPOINTS: ApiEndpoint[] = [
   { method: "DELETE", path: "/api/sabha-locations/:id", description: "Delete location", auth: "Required", params: ["id: number"], group: "Sabha Locations" },
 
   // Analytics
-  { method: "GET", path: "/api/stats", description: "Get overall statistics", auth: "Required", group: "Analytics" },
-  { method: "GET", path: "/api/analytics/dashboard", description: "Get dashboard analytics data", auth: "Required", group: "Analytics" },
-  { method: "GET", path: "/api/analytics/donations", description: "Get donation analytics", auth: "Required", group: "Analytics" },
-  { method: "GET", path: "/api/analytics/devotees", description: "Get devotee analytics", auth: "Required", group: "Analytics" },
-  { method: "GET", path: "/api/analytics/events", description: "Get event analytics", auth: "Required", group: "Analytics" },
-  { method: "GET", path: "/api/analytics/top-donors", description: "Get top donors", auth: "Required", group: "Analytics" },
-  { method: "GET", path: "/api/analytics/top-volunteers", description: "Get top volunteers", auth: "Required", group: "Analytics" },
+  { method: "GET", path: "/api/stats", description: "Get overall statistics (total devotees, families, donations, avg attendance)", auth: "Required", group: "Analytics" },
+  { method: "GET", path: "/api/analytics", description: "Get full analytics data (stats, donation trends, attendance trends, volunteering stats)", auth: "Required", group: "Analytics" },
 
   // Search
   { method: "GET", path: "/api/search", description: "Global search across all entities", auth: "Required", params: ["q: string"], group: "Search" },
@@ -123,7 +118,7 @@ const API_ENDPOINTS: ApiEndpoint[] = [
   // Admin
   { method: "GET", path: "/api/admin/seed/counts", description: "Get entity counts", auth: "Admin", group: "Admin" },
   { method: "POST", path: "/api/admin/seed/reset", description: "Reset all data to demo", auth: "Admin", group: "Admin" },
-  { method: "POST", path: "/api/admin/seed/:entity", description: "Add seed data for entity", auth: "Admin", params: ["entity: string", "count: number"], group: "Admin" },
+  { method: "POST", path: "/api/admin/seed/add", description: "Add seed data for entity (entity in body)", auth: "Admin", body: '{ "entity": "devotees|donations|...", "count": 5 }', group: "Admin" },
   { method: "GET", path: "/api/admin/export/data", description: "Export all data as JSON", auth: "Admin", group: "Admin" },
   { method: "GET", path: "/api/admin/export/entity", description: "Export single entity", auth: "Admin", params: ["table: string"], group: "Admin" },
   { method: "POST", path: "/api/admin/import/entity", description: "Import CSV/JSON to entity", auth: "Admin", params: ["table: string", "rows: array"], group: "Admin" },
@@ -132,7 +127,7 @@ const API_ENDPOINTS: ApiEndpoint[] = [
   { method: "GET", path: "/api/admin/rollback-slots", description: "Get rollback slots", auth: "Admin", group: "Admin" },
   { method: "POST", path: "/api/admin/rollback-slots", description: "Save rollback slot", auth: "Admin", group: "Admin" },
   { method: "POST", path: "/api/admin/rollback-slots/:id/restore", description: "Restore rollback slot", auth: "Admin", params: ["id: number"], group: "Admin" },
-  { method: "GET", path: "/api/admin/audit-log", description: "Get audit log entries", auth: "Admin", group: "Admin" },
+  { method: "GET", path: "/api/admin/audit", description: "Get audit log entries", auth: "Admin", group: "Admin" },
   { method: "GET", path: "/api/admin/visual-overrides", description: "Get visual overrides", auth: "Admin", group: "Admin" },
   { method: "POST", path: "/api/admin/visual-overrides", description: "Add visual override", auth: "Admin", group: "Admin" },
   { method: "GET", path: "/api/admin/dev-config", description: "Get dev configuration", auth: "Admin", group: "Admin" },

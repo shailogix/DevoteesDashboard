@@ -1,8 +1,8 @@
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Users, MessageCircle, Send } from "lucide-react";
+import { Plus, Users, MessageCircle, Send, ExternalLink } from "lucide-react";
+import { useLocation } from "wouter";
 import { Group } from "@shared/schema";
 
 interface GroupManagerProps {
@@ -14,24 +14,31 @@ interface GroupManagerProps {
   onSendBulkMessage: (group: Group) => void;
 }
 
-export function GroupManager({ 
-  groups, 
-  onAddGroup, 
-  onEditGroup, 
-  onCreateWhatsAppGroup, 
-  onCreateTelegramGroup, 
-  onSendBulkMessage 
+export function GroupManager({
+  groups,
+  onAddGroup,
+  onCreateWhatsAppGroup,
+  onCreateTelegramGroup,
+  onSendBulkMessage
 }: GroupManagerProps) {
+  const [, navigate] = useLocation();
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Group Management</CardTitle>
-            <Button onClick={onAddGroup}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Group
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={onAddGroup}>
+                <Plus className="w-4 h-4 mr-2" />
+                New Group
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/groups')}>
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Manage Groups
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -59,19 +66,19 @@ export function GroupManager({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => onEditGroup(group)}
+                        onClick={() => navigate('/groups')}
                       >
                         Edit
                       </Button>
                     </div>
                   </div>
-                  
+
                   {group.description && (
                     <p className="text-sm text-muted-foreground mb-3">
                       {group.description}
                     </p>
                   )}
-                  
+
                   <div className="flex items-center space-x-2">
                     <Button
                       variant="outline"

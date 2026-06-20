@@ -88,24 +88,28 @@ export default function Dashboard() {
             value={stats?.totalDevotees?.toLocaleString() || "0"}
             icon={Users}
             color="from-primary to-secondary"
+            href="/devotees"
           />
           <StatsCard
             title="Active Families"
             value={stats?.activeFamilies?.toLocaleString() || "0"}
             icon={Building}
             color="from-blue-500 to-blue-600"
+            href="/families"
           />
           <StatsCard
             title="Total Donations"
             value={`₹${(stats?.totalDonations || 0).toLocaleString('en-IN')}`}
             icon={Heart}
             color="from-green-500 to-green-600"
+            href="/donations"
           />
           <StatsCard
             title="Avg. Attendance"
             value={`${stats?.avgAttendance || 0}%`}
             icon={Calendar}
             color="from-yellow-500 to-yellow-600"
+            href="/attendance"
           />
         </div>
 
