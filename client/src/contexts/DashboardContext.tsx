@@ -29,7 +29,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [isDesignMode, setDesignMode] = useState(false);
 
   useEffect(() => {
-    // Load saved layout from localStorage
+    // Load saved layout from localStorage etc
     const savedLayout = localStorage.getItem('dashboard-layout');
     if (savedLayout) {
       try {
