@@ -2,15 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { MemoryStorage } from "./memoryStorage";
-// import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 
 import { randomBytes } from "crypto";
-
-// Mock authentication for development
-const isAuthenticated = (req: any, res: any, next: any) => {
-  req.user = { claims: { sub: 'dev-user-1' } };
-  next();
-};
 
 // GOD Mode session management — server-side authorization for privileged admin endpoints
 const godModeTokens = new Set<string>();
@@ -44,25 +38,17 @@ import {
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware - temporarily disabled for development
-  // await setupAuth(app);
+  // Auth middleware - Replit Auth
+  await setupAuth(app);
 
-  // Temporary mock auth for development
-  app.get('/api/auth/user', async (req: any, res) => {
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      // For development, return a mock user
-      const mockUser = {
-        id: 'dev-user-1',
-        email: 'dev@example.com',
-        firstName: 'Dev',
-        lastName: 'User',
-        profileImageUrl: null,
-        role: 'admin',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      res.json(mockUser);
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await storage.getUser(userId);
+      res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
