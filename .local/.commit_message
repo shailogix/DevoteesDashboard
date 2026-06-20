@@ -1,9 +1,0 @@
-Fix: Resolve git merge conflicts crashing the application
-
-Resolved 14 merge conflict markers across 3 files that prevented the app from starting:
-
-- server/routes.ts: 7 conflicts - kept HEAD version with requireGodMode security on feature-flags PATCH, visual-overrides PATCH/DELETE, rollback-slots POST/restore, seed/reset, seed/add; kept full featureFlags + receiptTemplate + analyticsDashboards + cardThemes data structure
-- client/src/contexts/VisualEditorContext.tsx: 5 conflicts - kept HEAD version using adminFetch (GOD Mode-aware) for all admin API calls instead of plain fetch
-- client/src/pages/DevStudio.tsx: 4 conflicts - kept HEAD version importing and using adminFetch for feature-flags, seed reset, and seed add mutations
-
-Also replaced all `as any` casts in Analytics.tsx with proper TypeScript interfaces (AnalyticsData, DevoteeSummary, EventSummary, DonationSummary) and typed useQuery generics accordingly.
