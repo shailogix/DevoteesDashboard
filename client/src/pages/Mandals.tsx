@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Search, Plus, Edit, Trash2, Eye, Landmark, Users, MapPin, CalendarDays } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Eye, Landmark, Users, MapPin, CalendarDays, Heart, HandHeart, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Mandal, Devotee, Event, SabhaLocation } from "@shared/schema";
@@ -29,6 +29,9 @@ export default function Mandals() {
   const { data: devotees = [] } = useQuery<Devotee[]>({ queryKey: ["/api/devotees"] });
   const { data: events = [] } = useQuery<Event[]>({ queryKey: ["/api/events"] });
   const { data: locations = [] } = useQuery<SabhaLocation[]>({ queryKey: ["/api/sabha-locations"] });
+  const { data: allDonations = [] } = useQuery<any[]>({ queryKey: ["/api/donations"] });
+  const { data: allVolunteering = [] } = useQuery<any[]>({ queryKey: ["/api/volunteering"] });
+  const { data: allAttendance = [] } = useQuery<any[]>({ queryKey: ["/api/attendance"] });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => apiRequest("POST", "/api/mandals", data),
@@ -177,6 +180,15 @@ export default function Mandals() {
                 <Card><CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Users className="w-4 h-4" /> Members</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{getMandalDevotees(viewMandal.name).length}</p></CardContent></Card>
                 <Card><CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><CalendarDays className="w-4 h-4" /> Events</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{getMandalEvents(viewMandal.name).length}</p></CardContent></Card>
                 <Card><CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><MapPin className="w-4 h-4" /> Locations</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{getMandalLocations(viewMandal.name).length}</p></CardContent></Card>
+                <Card><CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Heart className="w-4 h-4" /> Donations</CardTitle></CardHeader><CardContent>
+                  <p className="text-2xl font-bold">₹{getMandalDevotees(viewMandal.name).reduce((s: number, d: Devotee) => s + allDonations.filter((dn: any) => dn.devoteeId === d.id).reduce((ss: number, dn: any) => ss + parseFloat(dn.amount || '0'), 0), 0).toLocaleString("en-IN")}</p>
+                </CardContent></Card>
+                <Card><CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><HandHeart className="w-4 h-4" /> Seva Hours</CardTitle></CardHeader><CardContent>
+                  <p className="text-2xl font-bold">{getMandalDevotees(viewMandal.name).reduce((s: number, d: Devotee) => s + allVolunteering.filter((v: any) => v.devoteeId === d.id).reduce((ss: number, v: any) => ss + (v.hoursCompleted || v.hours || 0), 0), 0)}h</p>
+                </CardContent></Card>
+                <Card><CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Activity className="w-4 h-4" /> Attendance</CardTitle></CardHeader><CardContent>
+                  <p className="text-2xl font-bold">{getMandalDevotees(viewMandal.name).reduce((s: number, d: Devotee) => s + allAttendance.filter((a: any) => a.devoteeId === d.id).length, 0)}</p>
+                </CardContent></Card>
               </div>
               {getMandalDevotees(viewMandal.name).length > 0 && (
                 <div>

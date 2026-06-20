@@ -161,7 +161,7 @@ export default function Families() {
                   </TableHeader>
                   <TableBody>
                     {filteredFamilies.map((family: Family) => (
-                      <TableRow key={family.id} className="hover:bg-muted/30">
+                      <TableRow key={family.id} className="hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`/families/${family.id}`)}>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-sm font-bold text-primary">
@@ -196,12 +196,15 @@ export default function Families() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => openEdit(family)} title="Edit">
+                            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/families/${family.id}`); }} title="View">
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(family); }} title="Edit">
                               <Edit className="w-4 h-4" />
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" title="Delete">
+                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" title="Delete" onClick={(e) => e.stopPropagation()}>
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
                               </AlertDialogTrigger>

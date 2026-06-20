@@ -12,12 +12,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Building, Heart, Calendar, MessageSquare, Send } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useLocation } from "wouter";
+import { Users, Building, Heart, Calendar, MessageSquare, Send, TrendingUp, HandHeart, Landmark, BarChart3 } from "lucide-react";
 
 export default function Dashboard() {
   const { toast } = useToast();
   const [bulkMessageGroup, setBulkMessageGroup] = useState<any>(null);
   const [bulkMessage, setBulkMessage] = useState("");
+  const [, navigate] = useLocation();
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["/api/stats"],
@@ -26,6 +31,13 @@ export default function Dashboard() {
   const { data: groups } = useQuery({
     queryKey: ["/api/groups"],
   });
+
+  const { data: donations = [] } = useQuery<any[]>({ queryKey: ["/api/donations"] });
+  const { data: volunteering = [] } = useQuery<any[]>({ queryKey: ["/api/volunteering"] });
+  const { data: devotees = [] } = useQuery<any[]>({ queryKey: ["/api/devotees"] });
+  const { data: families = [] } = useQuery<any[]>({ queryKey: ["/api/families"] });
+  const { data: mandals = [] } = useQuery<any[]>({ queryKey: ["/api/mandals"] });
+  const { data: attendance = [] } = useQuery<any[]>({ queryKey: ["/api/attendance"] });
 
   if (statsLoading) {
     return (
@@ -106,9 +118,158 @@ export default function Dashboard() {
           <RecentActivities />
         </div>
 
+        {/* Interconnected Summary Widgets */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Top Donors */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" /> Top Donors
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {donations.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground text-sm">No donation records yet</div>
+              ) : (
+                <div className="space-y-2">
+                  {donations
+                    .sort((a: any, b: any) => parseFloat(b.amount || "0") - parseFloat(a.amount || "0"))
+                    .slice(0, 5)
+                    .map((d: any) => (
+                      <button
+                        key={d.id}
+                        onClick={() => d.devoteeId && navigate(`/devotees/${d.devoteeId}`)}
+                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 text-left transition-colors"
+                      >
+                        <Avatar className="w-8 h-8">
+                          <AvatarFallback className="text-xs bg-green-100 text-green-700">
+                            {(d.devoteeName || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{d.devoteeName || "Anonymous"}</div>
+                          <div className="text-xs text-muted-foreground">{d.donationType}</div>
+                        </div>
+                        <div className="text-sm font-bold text-green-600">₹{parseFloat(d.amount || "0").toLocaleString("en-IN")}</div>
+                      </button>
+                    ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Top Volunteers */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <HandHeart className="w-4 h-4" /> Top Volunteers
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {volunteering.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground text-sm">No volunteering records yet</div>
+              ) : (
+                <div className="space-y-2">
+                  {volunteering
+                    .sort((a: any, b: any) => (b.hoursCompleted || b.hours || 0) - (a.hoursCompleted || a.hours || 0))
+                    .slice(0, 5)
+                    .map((v: any) => (
+                      <button
+                        key={v.id}
+                        onClick={() => v.devoteeId && navigate(`/devotees/${v.devoteeId}`)}
+                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 text-left transition-colors"
+                      >
+                        <Avatar className="w-8 h-8">
+                          <AvatarFallback className="text-xs bg-purple-100 text-purple-700">
+                            {(v.devoteeName || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{v.devoteeName || "Unknown"}</div>
+                          <div className="text-xs text-muted-foreground">{v.activityType}</div>
+                        </div>
+                        <Badge variant="secondary">{v.hoursCompleted || v.hours || 0}h</Badge>
+                      </button>
+                    ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* By Mandal breakdown */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Landmark className="w-4 h-4" /> By Mandal
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {mandals.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground text-sm">No mandals configured yet</div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {mandals.map((m: any) => {
+                  const mDevs = devotees.filter((d: any) => d.city?.toLowerCase().includes(m.name?.toLowerCase()));
+                  const mDonations = mDevs.reduce((s: number, d: any) => s + donations.filter((dn: any) => dn.devoteeId === d.id).reduce((ss: number, dn: any) => ss + parseFloat(dn.amount || "0"), 0), 0);
+                  const mAttendance = mDevs.reduce((s: number, d: any) => s + attendance.filter((a: any) => a.devoteeId === d.id).length, 0);
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => navigate(`/mandals`)}
+                      className="text-left p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all"
+                    >
+                      <div className="text-sm font-medium">{m.name}</div>
+                      <div className="text-xs text-muted-foreground mt-1">{mDevs.length} devotees · ₹{mDonations.toLocaleString("en-IN")}</div>
+                      <div className="text-xs text-muted-foreground">{mAttendance} attendance records</div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Most Active Families */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building className="w-4 h-4" /> Most Active Families
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {families.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground text-sm">No families yet</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {families.slice(0, 6).map((f: any) => {
+                  const fMembers = devotees.filter((d: any) => d.familyId === f.id);
+                  const fDonations = fMembers.reduce((s: number, d: any) => s + donations.filter((dn: any) => dn.devoteeId === d.id).reduce((ss: number, dn: any) => ss + parseFloat(dn.amount || "0"), 0), 0);
+                  const fAttendance = fMembers.reduce((s: number, d: any) => s + attendance.filter((a: any) => a.devoteeId === d.id).length, 0);
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => navigate(`/families/${f.id}`)}
+                      className="text-left p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-sm font-bold text-primary">
+                          {f.familyName?.[0]}
+                        </div>
+                        <div className="font-medium text-sm truncate">{f.familyName}</div>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-2">{fMembers.length} members · ₹{fDonations.toLocaleString("en-IN")} · {fAttendance} attendances</div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Groups */}
         {groups && (
-          <GroupManager 
+          <GroupManager
             groups={groups}
             {...handleGroupActions}
           />

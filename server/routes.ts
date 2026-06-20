@@ -203,6 +203,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Devotee group memberships
+  app.get('/api/devotees/:id/groups', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const memberships = await storage.getGroupMemberships(id);
+      const groups = await storage.getGroups();
+      const enriched = memberships.map(m => {
+        const g = groups.find(gr => gr.id === m.groupId);
+        return { ...m, groupName: g?.groupName || "Unknown" };
+      });
+      res.json(enriched);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch devotee groups" });
+    }
+  });
+
+  // Devotee mandal info
+  app.get('/api/devotees/:id/mandal', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const devotee = await storage.getDevotee(id);
+      if (!devotee) return res.status(404).json({ message: "Devotee not found" });
+      const allMandals = await storage.getMandals();
+      const mandal = allMandals.find(m => m.name === devotee.city || m.name?.includes(devotee.city || ""));
+      res.json(mandal || null);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch mandal info" });
+    }
+  });
+
   // Family routes
   app.get('/api/families', isAuthenticated, async (req, res) => {
     try {
@@ -371,6 +401,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(500).json({ message: "Failed to auto-archive events" });
     }
+  });
+
+  // Event detail — related data
+  app.get('/api/events/:id/attendance', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const attendance = await storage.getAttendance(undefined, id);
+      const devotees = await storage.getDevotees();
+      const enriched = attendance.map(a => {
+        const d = devotees.find(dev => dev.id === a.devoteeId);
+        return { ...a, devoteeName: d ? `${d.firstName} ${d.lastName}` : "Unknown" };
+      });
+      res.json(enriched);
+    } catch (error) { res.status(500).json({ message: "Failed to fetch event attendance" }); }
+  });
+
+  app.get('/api/events/:id/donations', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const allDonations = await storage.getDonations();
+      // Note: donations don't have eventId in schema, so we filter by event date proximity
+      const event = await storage.getEvent(id);
+      if (!event) return res.status(404).json({ message: "Event not found" });
+      const eventDate = new Date(event.startDate);
+      const eventDonations = allDonations.filter(d => {
+        const dDate = new Date((d as any).donationDate || d.createdAt);
+        const diff = Math.abs(dDate.getTime() - eventDate.getTime());
+        return diff < 3 * 24 * 60 * 60 * 1000; // within 3 days
+      });
+      const devotees = await storage.getDevotees();
+      const enriched = eventDonations.map(d => {
+        const dev = devotees.find(dev => dev.id === d.devoteeId);
+        return { ...d, devoteeName: dev ? `${dev.firstName} ${dev.lastName}` : "Unknown" };
+      });
+      res.json(enriched);
+    } catch (error) { res.status(500).json({ message: "Failed to fetch event donations" }); }
+  });
+
+  app.get('/api/events/:id/volunteering', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const allVolunteering = await storage.getVolunteering();
+      const event = await storage.getEvent(id);
+      if (!event) return res.status(404).json({ message: "Event not found" });
+      const eventDate = new Date(event.startDate);
+      const eventVolunteering = allVolunteering.filter(v => {
+        const vDate = new Date(v.startDate || v.createdAt);
+        const diff = Math.abs(vDate.getTime() - eventDate.getTime());
+        return diff < 3 * 24 * 60 * 60 * 1000; // within 3 days
+      });
+      const devotees = await storage.getDevotees();
+      const enriched = eventVolunteering.map(v => {
+        const dev = devotees.find(dev => dev.id === v.devoteeId);
+        return { ...v, devoteeName: dev ? `${dev.firstName} ${dev.lastName}` : "Unknown" };
+      });
+      res.json(enriched);
+    } catch (error) { res.status(500).json({ message: "Failed to fetch event volunteering" }); }
   });
 
   // Volunteering routes
@@ -659,6 +746,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Extended family routes
+  app.get('/api/families/:id/stats', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const family = await storage.getFamily(id);
+      if (!family) return res.status(404).json({ message: "Family not found" });
+      const members = await storage.getDevoteesByFamily(id);
+      const devoteeIds = members.map(d => d.id);
+      const allDonations = await storage.getDonations();
+      const familyDonations = allDonations.filter(d => devoteeIds.includes(d.devoteeId));
+      const totalDonations = familyDonations.reduce((sum, d) => sum + parseFloat(String(d.amount) || '0'), 0);
+      const allAttendance = await storage.getAttendance();
+      const familyAttendance = allAttendance.filter(a => devoteeIds.includes(a.devoteeId));
+      const presentRecords = familyAttendance.filter(a => (a as any).status === 'present');
+      const attendanceRate = familyAttendance.length > 0
+        ? Math.round((presentRecords.length / familyAttendance.length) * 100)
+        : 0;
+      const allVolunteering = await storage.getVolunteering();
+      const familyVolunteering = allVolunteering.filter(v => devoteeIds.includes(v.devoteeId));
+      const totalHours = familyVolunteering.reduce((sum, v) => sum + ((v as any).hoursCompleted || (v as any).hours || 0), 0);
+      res.json({
+        totalMembers: members.length,
+        totalDonations,
+        attendanceRate,
+        totalVolunteeringHours: totalHours,
+        totalEventsAttended: familyAttendance.length,
+      });
+    } catch (error) { res.status(500).json({ message: "Failed to fetch family stats" }); }
+  });
+
+  app.get('/api/mandals/:id/stats', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const mandal = await storage.getMandal(id);
+      if (!mandal) return res.status(404).json({ message: "Mandal not found" });
+      const stats = await storage.getMandalStats(mandal.name);
+      res.json(stats);
+    } catch (error) { res.status(500).json({ message: "Failed to fetch mandal stats" }); }
+  });
+
+  app.get('/api/mandals/:id/members', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const mandal = await storage.getMandal(id);
+      if (!mandal) return res.status(404).json({ message: "Mandal not found" });
+      const members = await storage.getMandalMembers(mandal.name);
+      res.json(members);
+    } catch (error) { res.status(500).json({ message: "Failed to fetch mandal members" }); }
+  });
+
   app.put('/api/families/:id', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);

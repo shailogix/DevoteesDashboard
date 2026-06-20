@@ -19,6 +19,8 @@ import {
   type InsertGroup,
   type GroupEntry,
   type InsertGroupEntry,
+  type GroupMembership,
+  type InsertGroupMembership,
   type Mandal,
   type InsertMandal,
   type SabhaLocation,
@@ -66,6 +68,7 @@ export class MemoryStorage implements IStorage {
   private volunteering: Map<number, Volunteering> = new Map();
   private groups: Map<number, Group> = new Map();
   private groupEntries: Map<number, GroupEntry> = new Map();
+  private groupMemberships: Map<number, GroupMembership> = new Map();
   private mandals: Map<number, Mandal> = new Map();
   private sabhaLocations: Map<number, SabhaLocation> = new Map();
   private dashboardLayouts: Map<number, DashboardLayout> = new Map();
@@ -101,6 +104,7 @@ export class MemoryStorage implements IStorage {
     volunteering: 1,
     groups: 1,
     groupEntries: 1,
+    groupMemberships: 1,
     mandals: 1,
     sabhaLocations: 1,
     dashboardLayouts: 1,
@@ -923,6 +927,59 @@ export class MemoryStorage implements IStorage {
     return this.groupEntries.delete(id);
   }
 
+  async getGroupMemberships(devoteeId?: number, groupId?: number): Promise<GroupMembership[]> {
+    let result = Array.from(this.groupMemberships.values());
+    if (devoteeId) result = result.filter(gm => gm.devoteeId === devoteeId);
+    if (groupId) result = result.filter(gm => gm.groupId === groupId);
+    return result.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async createGroupMembership(membershipData: InsertGroupMembership): Promise<GroupMembership> {
+    const now = new Date();
+    const id = this.counters.groupMemberships++;
+    const membership: GroupMembership = {
+      id,
+      ...membershipData,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.groupMemberships.set(id, membership);
+    return membership;
+  }
+
+  async deleteGroupMembership(id: number): Promise<boolean> {
+    return this.groupMemberships.delete(id);
+  }
+
+  async getMandalMembers(mandalName: string): Promise<Devotee[]> {
+    return Array.from(this.devotees.values()).filter(d => d.city === mandalName);
+  }
+
+  async getMandalStats(mandalName: string): Promise<any> {
+    const members = await this.getMandalMembers(mandalName);
+    const devoteeIds = members.map(d => d.id);
+    const allDonations = Array.from(this.donations.values());
+    const mandalDonations = allDonations.filter(d => devoteeIds.includes(d.devoteeId));
+    const totalDonations = mandalDonations.reduce((sum, d) => sum + parseFloat(String(d.amount) || '0'), 0);
+    const allAttendance = Array.from(this.attendance.values());
+    const mandalAttendance = allAttendance.filter(a => devoteeIds.includes(a.devoteeId));
+    const presentRecords = mandalAttendance.filter(a => (a as any).status === 'present');
+    const totalAttendance = mandalAttendance.length > 0
+      ? Math.round((presentRecords.length / mandalAttendance.length) * 100)
+      : 0;
+    const allFamilies = Array.from(this.families.values());
+    const mandalFamilies = allFamilies.filter(f => f.city === mandalName);
+    const allEvents = Array.from(this.events.values());
+    const mandalEvents = allEvents.filter(e => e.location?.toLowerCase().includes(mandalName.toLowerCase()));
+    return {
+      totalDevotees: members.length,
+      totalFamilies: mandalFamilies.length,
+      totalDonations,
+      totalAttendance,
+      totalEvents: mandalEvents.length,
+    };
+  }
+
   // Mandal operations
   async getMandals(): Promise<Mandal[]> {
     return Array.from(this.mandals.values()).sort((a, b) =>
@@ -1200,6 +1257,7 @@ export class MemoryStorage implements IStorage {
     this.volunteering.clear();
     this.groups.clear();
     this.groupEntries.clear();
+    this.groupMemberships.clear();
     this.mandals.clear();
     this.sabhaLocations.clear();
     this.dashboardLayouts.clear();

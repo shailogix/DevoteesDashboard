@@ -555,6 +555,11 @@ export const insertGroupSchema = createInsertSchema(groups).omit({
   updatedAt: true,
 });
 
+export const insertGroupMembershipSchema = createInsertSchema(groupMemberships).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertGroupEntrySchema = createInsertSchema(groupEntries).omit({
   id: true,
   createdAt: true,
@@ -658,6 +663,9 @@ export type Group = typeof groups.$inferSelect;
 
 export type InsertGroupEntry = z.infer<typeof insertGroupEntrySchema>;
 export type GroupEntry = typeof groupEntries.$inferSelect;
+
+export type InsertGroupMembership = z.infer<typeof insertGroupMembershipSchema>;
+export type GroupMembership = typeof groupMemberships.$inferSelect;
 
 export type InsertMandal = z.infer<typeof insertMandalSchema>;
 export type Mandal = typeof mandals.$inferSelect;

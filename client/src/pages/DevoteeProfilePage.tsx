@@ -82,6 +82,18 @@ export default function DevoteeProfilePage() {
     enabled: !!id,
   });
 
+  const { data: groups = [] } = useQuery<any[]>({
+    queryKey: ["/api/devotees", id, "groups"],
+    queryFn: () => fetch(`/api/devotees/${id}/groups`).then(r => r.json()),
+    enabled: !!id,
+  });
+
+  const { data: mandal } = useQuery<any>({
+    queryKey: ["/api/devotees", id, "mandal"],
+    queryFn: () => fetch(`/api/devotees/${id}/mandal`).then(r => r.json()),
+    enabled: !!id,
+  });
+
   const uploadDocMutation = useMutation({
     mutationFn: async ({ type, filename, base64 }: { type: string; filename: string; base64: string }) =>
       adminFetch(`/api/devotees/${id}/documents`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, filename, base64 }) }),
@@ -258,6 +270,27 @@ export default function DevoteeProfilePage() {
                 <div className="text-2xl font-bold text-orange-600">{(analytics?.volunteering || []).length}</div>
                 <div className="text-xs text-muted-foreground">Seva Activities</div>
               </div>
+            </div>
+
+            {/* Groups & Mandal */}
+            <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
+              {mandal?.name && (
+                <button
+                  onClick={() => navigate(`/mandals`)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors"
+                >
+                  <MapPin className="w-3 h-3" /> {mandal.name}
+                </button>
+              )}
+              {groups.map((g: any) => (
+                <button
+                  key={g.id}
+                  onClick={() => navigate(`/groups`)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition-colors"
+                >
+                  <Users className="w-3 h-3" /> {g.groupName || g.name}
+                </button>
+              ))}
             </div>
           </div>
 

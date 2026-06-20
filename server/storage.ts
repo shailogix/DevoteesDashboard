@@ -43,6 +43,8 @@ import {
   type InsertGroup,
   type GroupEntry,
   type InsertGroupEntry,
+  type GroupMembership,
+  type InsertGroupMembership,
   type Mandal,
   type InsertMandal,
   type SabhaLocation,
@@ -131,11 +133,23 @@ export interface IStorage {
   updateGroupEntry(id: number, entry: Partial<InsertGroupEntry>): Promise<GroupEntry>;
   deleteGroupEntry(id: number): Promise<boolean>;
 
+  getGroupMemberships(devoteeId?: number, groupId?: number): Promise<GroupMembership[]>;
+  createGroupMembership(membership: InsertGroupMembership): Promise<GroupMembership>;
+  deleteGroupMembership(id: number): Promise<boolean>;
+
   getMandals(): Promise<Mandal[]>;
   getMandal(id: number): Promise<Mandal | undefined>;
   createMandal(mandal: InsertMandal): Promise<Mandal>;
   updateMandal(id: number, mandal: Partial<InsertMandal>): Promise<Mandal>;
   deleteMandal(id: number): Promise<boolean>;
+  getMandalMembers(mandalName: string): Promise<Devotee[]>;
+  getMandalStats(mandalName: string): Promise<{
+    totalDevotees: number;
+    totalFamilies: number;
+    totalDonations: number;
+    totalAttendance: number;
+    totalEvents: number;
+  }>;
 
   getSabhaLocations(): Promise<SabhaLocation[]>;
   getSabhaLocation(id: number): Promise<SabhaLocation | undefined>;
@@ -537,6 +551,56 @@ export class DatabaseStorage implements IStorage {
   async deleteGroupEntry(id: number): Promise<boolean> {
     const result = await db.delete(groupEntries).where(eq(groupEntries.id, id));
     return (result.rowCount ?? 0) > 0;
+  }
+
+  async getGroupMemberships(devoteeId?: number, groupId?: number): Promise<GroupMembership[]> {
+    let conditions = [];
+    if (devoteeId) conditions.push(eq(groupMemberships.devoteeId, devoteeId));
+    if (groupId) conditions.push(eq(groupMemberships.groupId, groupId));
+    if (conditions.length === 0) {
+      return await db.select().from(groupMemberships);
+    }
+    return await db.select().from(groupMemberships).where(and(...conditions)) as any;
+  }
+
+  async createGroupMembership(membership: InsertGroupMembership): Promise<GroupMembership> {
+    const [newMembership] = await db.insert(groupMemberships).values(membership).returning();
+    return newMembership;
+  }
+
+  async deleteGroupMembership(id: number): Promise<boolean> {
+    const result = await db.delete(groupMemberships).where(eq(groupMemberships.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getMandalMembers(mandalName: string): Promise<Devotee[]> {
+    const allDevotees = await db.select().from(devotees);
+    return allDevotees.filter(d => d.city === mandalName);
+  }
+
+  async getMandalStats(mandalName: string): Promise<any> {
+    const members = await this.getMandalMembers(mandalName);
+    const devoteeIds = members.map(d => d.id);
+    const allDonations = await db.select().from(donations);
+    const mandalDonations = allDonations.filter(d => devoteeIds.includes(d.devoteeId));
+    const totalDonations = mandalDonations.reduce((sum, d) => sum + parseFloat(String(d.amount) || '0'), 0);
+    const allAttendance = await db.select().from(attendance);
+    const mandalAttendance = allAttendance.filter(a => devoteeIds.includes(a.devoteeId));
+    const presentRecords = mandalAttendance.filter(a => (a as any).status === 'present');
+    const totalAttendance = mandalAttendance.length > 0
+      ? Math.round((presentRecords.length / mandalAttendance.length) * 100)
+      : 0;
+    const allFamilies = await db.select().from(families);
+    const mandalFamilies = allFamilies.filter(f => f.city === mandalName);
+    const allEvents = await db.select().from(events);
+    const mandalEvents = allEvents.filter(e => e.location?.toLowerCase().includes(mandalName.toLowerCase()));
+    return {
+      totalDevotees: members.length,
+      totalFamilies: mandalFamilies.length,
+      totalDonations,
+      totalAttendance,
+      totalEvents: mandalEvents.length,
+    };
   }
 
   async getMandals(): Promise<Mandal[]> {
@@ -1020,11 +1084,17 @@ class FallbackStorage implements IStorage {
   async updateGroupEntry(id: number, entry: Partial<InsertGroupEntry>) { return this.executeWithFallback(s => s.updateGroupEntry(id, entry)); }
   async deleteGroupEntry(id: number) { return this.executeWithFallback(s => s.deleteGroupEntry(id)); }
 
+  async getGroupMemberships(devoteeId?: number, groupId?: number) { return this.executeWithFallback(s => s.getGroupMemberships(devoteeId, groupId)); }
+  async createGroupMembership(membership: InsertGroupMembership) { return this.executeWithFallback(s => s.createGroupMembership(membership)); }
+  async deleteGroupMembership(id: number) { return this.executeWithFallback(s => s.deleteGroupMembership(id)); }
+
   async getMandals() { return this.executeWithFallback(s => s.getMandals()); }
   async getMandal(id: number) { return this.executeWithFallback(s => s.getMandal(id)); }
   async createMandal(mandal: InsertMandal) { return this.executeWithFallback(s => s.createMandal(mandal)); }
   async updateMandal(id: number, mandal: Partial<InsertMandal>) { return this.executeWithFallback(s => s.updateMandal(id, mandal)); }
   async deleteMandal(id: number) { return this.executeWithFallback(s => s.deleteMandal(id)); }
+  async getMandalMembers(mandalName: string) { return this.executeWithFallback(s => s.getMandalMembers(mandalName)); }
+  async getMandalStats(mandalName: string) { return this.executeWithFallback(s => s.getMandalStats(mandalName)); }
 
   async getSabhaLocations() { return this.executeWithFallback(s => s.getSabhaLocations()); }
   async getSabhaLocation(id: number) { return this.executeWithFallback(s => s.getSabhaLocation(id)); }

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { apiRequest } from "@/lib/queryClient";
+import GlobalSearch from "@/components/Layout/GlobalSearch";
 import {
   Bell, Check, CheckCheck, Trash2, AlertTriangle, Info,
   CheckCircle, XCircle, X, Pin, PinOff
@@ -161,6 +162,7 @@ export function Header({ title, subtitle, actions }: HeaderProps) {
         </div>
 
         <div className="flex items-center space-x-3">
+          <GlobalSearch />
           {actions}
 
           {/* Bell button */}

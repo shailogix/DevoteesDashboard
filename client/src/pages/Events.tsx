@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { CalendarDays, Plus, MapPin, Users, Clock, Edit, Trash2, Archive, ArchiveRestore, Image, Search } from "lucide-react";
+import { CalendarDays, Plus, MapPin, Users, Clock, Edit, Trash2, Archive, ArchiveRestore, Image, Search, Eye } from "lucide-react";
+import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Event } from "@shared/schema";
@@ -156,13 +157,14 @@ function EventFormDialog({ event, onClose }: { event?: Event | null; onClose: ()
 }
 
 function EventCard({
-  event, onEdit, onDelete, onArchive, onUnarchive
+  event, onEdit, onDelete, onArchive, onUnarchive, onView
 }: {
   event: Event;
   onEdit: () => void;
   onDelete: () => void;
   onArchive: () => void;
   onUnarchive: () => void;
+  onView: () => void;
 }) {
   const now = new Date();
   const start = new Date(event.startDate);
@@ -231,6 +233,9 @@ function EventCard({
           <Button size="sm" variant="outline" className="flex-1 h-7 text-xs" onClick={onEdit}>
             <Edit className="w-3 h-3 mr-1" /> Edit
           </Button>
+          <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={onView}>
+            <Eye className="w-3 h-3 mr-1" /> View
+          </Button>
           {isArchived ? (
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onUnarchive}>
               <ArchiveRestore className="w-3 h-3 mr-1" /> Restore
@@ -273,6 +278,7 @@ export default function Events() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
 
   const { data: events = [], isLoading } = useQuery<Event[]>({ queryKey: ["/api/events"] });
 
@@ -413,6 +419,7 @@ export default function Events() {
                 onDelete={() => deleteMutation.mutate(event.id)}
                 onArchive={() => archiveMutation.mutate(event.id)}
                 onUnarchive={() => unarchiveMutation.mutate(event.id)}
+                onView={() => navigate(`/events/${event.id}`)}
               />
             ))}
           </div>

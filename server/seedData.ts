@@ -3,10 +3,10 @@ import { storage } from "./storage";
 
 export async function seedDemoData() {
   try {
-    // Skip if data already seeded (check any existing groups)
-    const existingGroups = await storage.getGroups();
-    if (existingGroups.length > 0) {
-      console.log("Demo data already present, skipping seed.");
+    // Skip if data already seeded (check donations - indicates full seed)
+    const existingDonations = await storage.getDonations();
+    if (existingDonations.length > 0) {
+      console.log("Demo data already present (donations exist), skipping seed.");
       return;
     }
 
@@ -123,78 +123,150 @@ export async function seedDemoData() {
       await storage.createGroup(group);
     }
 
-    // Add demo entries to each group
-    const createdGroups = await storage.getGroups();
-    
-    // Demo family entries
-    const familyGroup = createdGroups.find(g => g.groupName === "Families");
-    if (familyGroup) {
-      const familyEntries = [
-        {
-          groupId: familyGroup.id,
-          entryData: {
-            familyName: "Sharma Family",
-            headOfFamily: "Rajesh Sharma",
-            totalMembers: 4,
-            fullAddress: "A-123, Sector 15, Noida, UP",
-            mobileNumber: "9876543210",
-          },
-          uniqueMemberId: "FAM001",
-          qrIdentifier: "JAISHRIMADHAV_FAM001",
-        },
-        {
-          groupId: familyGroup.id,
-          entryData: {
-            familyName: "Gupta Family",
-            headOfFamily: "Suresh Gupta",
-            totalMembers: 5,
-            fullAddress: "B-456, Andheri West, Mumbai, MH",
-            mobileNumber: "9876543211",
-          },
-          uniqueMemberId: "FAM002",
-          qrIdentifier: "JAISHRIMADHAV_FAM002",
-        },
-      ];
+    // Seed Families
+    const familyData = [
+      { familyName: "Sharma Family", headOfFamily: null, address: "42 Tulsi Nagar, Navrangpura", city: "Ahmedabad", state: "Gujarat", pincode: "380009", country: "India", phone: "9876543210", email: "sharma.family@email.com", totalMembers: 4, emergencyContact: "Ramesh Sharma", notes: "Founding family", isActive: true },
+      { familyName: "Patel Family", headOfFamily: null, address: "17 Krishna Lane, Athwa", city: "Surat", state: "Gujarat", pincode: "395001", country: "India", phone: "9876543220", email: "patel.family@email.com", totalMembers: 3, emergencyContact: "Suresh Patel", notes: "Major donors", isActive: true },
+      { familyName: "Desai Family", headOfFamily: null, address: "5 Radha Niwas, Alkapuri", city: "Vadodara", state: "Gujarat", pincode: "390007", country: "India", phone: "9876543230", email: "desai.family@email.com", totalMembers: 3, emergencyContact: "Nilesh Desai", notes: "Senior mentors", isActive: true },
+      { familyName: "Mehta Family", headOfFamily: null, address: "88 Satellite Road, Satellite", city: "Ahmedabad", state: "Gujarat", pincode: "380015", country: "India", phone: "9898765432", email: "mehta.family@email.com", totalMembers: 4, emergencyContact: "Vikram Mehta", notes: "Recently joined", isActive: true },
+      { familyName: "Joshi Family", headOfFamily: null, address: "22 Hanuman Chowk, Old City", city: "Surat", state: "Gujarat", pincode: "395003", country: "India", phone: "9712345678", email: "joshi.family@email.com", totalMembers: 3, emergencyContact: "Dinesh Joshi", notes: "Long-standing volunteers", isActive: true },
+    ];
+    const seededFamilies: any[] = [];
+    for (const f of familyData) {
+      const created = await storage.createFamily(f);
+      seededFamilies.push(created);
+    }
 
-      for (const entry of familyEntries) {
-        await storage.createGroupEntry(entry);
+    // Seed Devotees (first pass, no mentorId)
+    const devoteeData = [
+      { devoteeId: "MP-001", firstName: "Ramesh", lastName: "Sharma", email: "ramesh.sharma@email.com", phone: "9876543210", whatsappNumber: "9876543210", dateOfBirth: new Date("1975-03-15"), gender: "Male", address: "42 Tulsi Nagar, Navrangpura", city: "Ahmedabad", state: "Gujarat", pincode: "380009", country: "India", occupation: "Civil Engineer", spiritualLevel: "Advanced", mentorId: null, familyId: seededFamilies[0]?.id, profileImage: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ramesh", notes: "Founding member", specialSkills: "Kirtan leadership", previousExperience: "5 years", emergencyContact: "Sunita Sharma", emergencyPhone: "9876543211", dietaryPreferences: "Vegetarian", isActive: true },
+      { devoteeId: "MP-002", firstName: "Sunita", lastName: "Sharma", email: "sunita.sharma@email.com", phone: "9876543211", whatsappNumber: "9876543211", dateOfBirth: new Date("1978-07-22"), gender: "Female", address: "42 Tulsi Nagar, Navrangpura", city: "Ahmedabad", state: "Gujarat", pincode: "380009", country: "India", occupation: "School Teacher", spiritualLevel: "Intermediate", mentorId: null, familyId: seededFamilies[0]?.id, profileImage: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sunita", notes: "Leads women's satsang", specialSkills: "Bhajan singing", previousExperience: "3 years", emergencyContact: "Ramesh Sharma", emergencyPhone: "9876543210", dietaryPreferences: "Vegan", isActive: true },
+      { devoteeId: "MP-003", firstName: "Arjun", lastName: "Sharma", email: "arjun.sharma@email.com", phone: "9876543212", whatsappNumber: "9876543212", dateOfBirth: new Date("2000-11-05"), gender: "Male", address: "42 Tulsi Nagar, Navrangpura", city: "Ahmedabad", state: "Gujarat", pincode: "380009", country: "India", occupation: "Engineering Student", spiritualLevel: "Beginner", mentorId: null, familyId: seededFamilies[0]?.id, profileImage: "https://api.dicebear.com/7.x/avataaars/svg?seed=Arjun", notes: "Youth leader", specialSkills: "Mridanga", emergencyContact: "Ramesh Sharma", emergencyPhone: "9876543210", dietaryPreferences: "Vegetarian", isActive: true },
+      { devoteeId: "MP-004", firstName: "Priya", lastName: "Sharma", email: "priya.sharma@email.com", phone: "9876543213", whatsappNumber: "9876543213", dateOfBirth: new Date("2003-05-18"), gender: "Female", address: "42 Tulsi Nagar, Navrangpura", city: "Ahmedabad", state: "Gujarat", pincode: "380009", country: "India", occupation: "Class 12 Student", spiritualLevel: "Beginner", mentorId: null, familyId: seededFamilies[0]?.id, profileImage: "https://api.dicebear.com/7.x/avataaars/svg?seed=Priya", notes: "Art and decoration", specialSkills: "Rangoli", emergencyContact: "Sunita Sharma", emergencyPhone: "9876543211", dietaryPreferences: "Vegetarian", isActive: true },
+      { devoteeId: "MP-005", firstName: "Suresh", lastName: "Patel", email: "suresh.patel@email.com", phone: "9876543220", whatsappNumber: "9876543220", dateOfBirth: new Date("1968-09-30"), gender: "Male", address: "17 Krishna Lane, Athwa", city: "Surat", state: "Gujarat", pincode: "395001", country: "India", occupation: "Textile Businessman", spiritualLevel: "Teacher", mentorId: null, familyId: seededFamilies[1]?.id, profileImage: "https://api.dicebear.com/7.x/avataaars/svg?seed=Suresh", notes: "Primary donor", specialSkills: "Event management", previousExperience: "10 years", emergencyContact: "Meena Patel", emergencyPhone: "9876543221", dietaryPreferences: "Vegan", isActive: true },
+      { devoteeId: "MP-006", firstName: "Meena", lastName: "Patel", email: "meena.patel@email.com", phone: "9876543221", whatsappNumber: "9876543221", dateOfBirth: new Date("1972-02-14"), gender: "Female", address: "17 Krishna Lane, Athwa", city: "Surat", state: "Gujarat", pincode: "395001", country: "India", occupation: "Paediatrician", spiritualLevel: "Advanced", mentorId: null, familyId: seededFamilies[1]?.id, profileImage: "https://api.dicebear.com/7.x/avataaars/svg?seed=Meena", notes: "Medical seva", specialSkills: "First aid", previousExperience: "8 years", emergencyContact: "Suresh Patel", emergencyPhone: "9876543220", dietaryPreferences: "Vegetarian", isActive: true },
+      { devoteeId: "MP-007", firstName: "Rohan", lastName: "Patel", email: "rohan.patel@email.com", phone: "9876543222", whatsappNumber: "9876543222", dateOfBirth: new Date("1998-08-20"), gender: "Male", address: "17 Krishna Lane, Athwa", city: "Surat", state: "Gujarat", pincode: "395001", country: "India", occupation: "Software Developer", spiritualLevel: "Intermediate", mentorId: null, familyId: seededFamilies[1]?.id, profileImage: "https://api.dicebear.com/7.x/avataaars/svg?seed=Rohan", notes: "Youth tech lead", specialSkills: "Web development", emergencyContact: "Suresh Patel", emergencyPhone: "9876543220", dietaryPreferences: "Vegetarian", isActive: true },
+      { devoteeId: "MP-008", firstName: "Nilesh", lastName: "Desai", email: "nilesh.desai@email.com", phone: "9876543230", whatsappNumber: "9876543230", dateOfBirth: new Date("1960-05-10"), gender: "Male", address: "5 Radha Niwas, Alkapuri", city: "Vadodara", state: "Gujarat", pincode: "390007", country: "India", occupation: "Retired Professor", spiritualLevel: "Advanced", mentorId: null, familyId: seededFamilies[2]?.id, profileImage: "https://api.dicebear.com/7.x/avataaars/svg?seed=Nilesh", notes: "Senior teacher", specialSkills: "Scripture teaching", previousExperience: "20 years", emergencyContact: "Hema Desai", emergencyPhone: "9876543231", dietaryPreferences: "Vegetarian", isActive: true },
+      { devoteeId: "MP-009", firstName: "Hema", lastName: "Desai", email: "hema.desai@email.com", phone: "9876543231", whatsappNumber: "9876543231", dateOfBirth: new Date("1962-11-25"), gender: "Female", address: "5 Radha Niwas, Alkapuri", city: "Vadodara", state: "Gujarat", pincode: "390007", country: "India", occupation: "Homemaker", spiritualLevel: "Advanced", mentorId: null, familyId: seededFamilies[2]?.id, profileImage: "https://api.dicebear.com/7.x/avataaars/svg?seed=Hema", notes: "Cooking seva", specialSkills: "Cooking", previousExperience: "15 years", emergencyContact: "Nilesh Desai", emergencyPhone: "9876543230", dietaryPreferences: "Vegetarian", isActive: true },
+      { devoteeId: "MP-010", firstName: "Aditya", lastName: "Desai", email: "aditya.desai@email.com", phone: "9876543232", whatsappNumber: "9876543232", dateOfBirth: new Date("1995-03-08"), gender: "Male", address: "5 Radha Niwas, Alkapuri", city: "Vadodara", state: "Gujarat", pincode: "390007", country: "India", occupation: "Chartered Accountant", spiritualLevel: "Intermediate", mentorId: null, familyId: seededFamilies[2]?.id, profileImage: "https://api.dicebear.com/7.x/avataaars/svg?seed=Aditya", notes: "Finance seva", specialSkills: "Accounting", emergencyContact: "Nilesh Desai", emergencyPhone: "9876543230", dietaryPreferences: "Vegetarian", isActive: true },
+    ];
+    const seededDevotees: any[] = [];
+    for (const d of devoteeData) {
+      const created = await storage.createDevotee(d);
+      seededDevotees.push(created);
+    }
+
+    // Update family heads
+    for (let i = 0; i < seededFamilies.length; i++) {
+      const familyDevotees = seededDevotees.filter((d: any) => d.familyId === seededFamilies[i].id);
+      if (familyDevotees.length > 0) {
+        await storage.updateFamily(seededFamilies[i].id, { headOfFamily: familyDevotees[0].id });
       }
     }
 
-    // Demo mentor entries
-    const mentorGroup = createdGroups.find(g => g.groupName === "Mentors");
-    if (mentorGroup) {
-      const mentorEntries = [
-        {
-          groupId: mentorGroup.id,
-          entryData: {
-            firstName: "Pandit",
-            surname: "Vishwanath",
-            specialization: "Vedic Studies",
-            experience: 15,
-            mobileNumber: "9876543212",
-            maxMentees: 20,
-          },
-          uniqueMemberId: "MEN001",
-          qrIdentifier: "JAISHRIMADHAV_MEN001",
-        },
-        {
-          groupId: mentorGroup.id,
-          entryData: {
-            firstName: "Mata",
-            surname: "Saraswati",
-            specialization: "Spiritual Counseling",
-            experience: 12,
-            mobileNumber: "9876543213",
-            maxMentees: 15,
-          },
-          uniqueMemberId: "MEN002",
-          qrIdentifier: "JAISHRIMADHAV_MEN002",
-        },
-      ];
+    // Seed Mentors (need existing devoteeId)
+    const mentorData = [
+      { devoteeId: seededDevotees[7].id, specialization: "Vedic Studies", experience: "15", qualifications: "M.A. Sanskrit, Ph.D. Vedic Studies", availableHours: "Weekends", contactPreference: "phone", maxMentees: 20, currentMentees: 12, isActive: true },
+      { devoteeId: seededDevotees[5].id, specialization: "Bhakti Yoga", experience: "10", qualifications: "Yoga Instructor Certificate", availableHours: "Evenings", contactPreference: "whatsapp", maxMentees: 15, currentMentees: 8, isActive: true },
+      { devoteeId: seededDevotees[0].id, specialization: "Kirtan", experience: "8", qualifications: "Sangit Visharad", availableHours: "Daily mornings", contactPreference: "phone", maxMentees: 25, currentMentees: 18, isActive: true },
+    ];
+    const seededMentors: any[] = [];
+    for (const m of mentorData) {
+      const created = await storage.createMentor(m);
+      seededMentors.push(created);
+    }
 
-      for (const entry of mentorEntries) {
-        await storage.createGroupEntry(entry);
+    // Update devotees with mentorIds
+    await storage.updateDevotee(seededDevotees[0].id, { mentorId: seededMentors[2]?.id });
+    await storage.updateDevotee(seededDevotees[1].id, { mentorId: seededMentors[0]?.id });
+    await storage.updateDevotee(seededDevotees[2].id, { mentorId: seededMentors[2]?.id });
+    await storage.updateDevotee(seededDevotees[5].id, { mentorId: seededMentors[0]?.id });
+    await storage.updateDevotee(seededDevotees[6].id, { mentorId: seededMentors[2]?.id });
+    await storage.updateDevotee(seededDevotees[8].id, { mentorId: seededMentors[0]?.id });
+    await storage.updateDevotee(seededDevotees[9].id, { mentorId: seededMentors[2]?.id });
+
+    // Seed Events
+    const now = new Date();
+    const eventData = [
+      { title: "Satsang at Ahmedabad", description: "Weekly satsang at Ahmedabad", eventType: "satsang", location: "Ahmedabad", startDate: new Date(now.getFullYear(), now.getMonth(), 5), endDate: new Date(now.getFullYear(), now.getMonth(), 5), startTime: "18:00", endTime: "20:00", status: "completed", isActive: true, cost: "0", registrationRequired: false, maxParticipants: 50 },
+      { title: "Janmashtami Festival", description: "Grand Janmashtami celebration", eventType: "festival", location: "Ahmedabad", startDate: new Date(now.getFullYear(), now.getMonth(), 15), endDate: new Date(now.getFullYear(), now.getMonth(), 16), startTime: "08:00", endTime: "22:00", status: "completed", isActive: true, cost: "0", registrationRequired: true, maxParticipants: 200 },
+      { title: "Youth Workshop", description: "Youth spiritual development workshop", eventType: "workshop", location: "Surat", startDate: new Date(now.getFullYear(), now.getMonth(), 20), endDate: new Date(now.getFullYear(), now.getMonth(), 20), startTime: "10:00", endTime: "16:00", status: "completed", isActive: true, cost: "100", registrationRequired: true, maxParticipants: 30 },
+      { title: "Satsang at Surat", description: "Monthly satsang", eventType: "satsang", location: "Surat", startDate: new Date(now.getFullYear(), now.getMonth(), 25), endDate: new Date(now.getFullYear(), now.getMonth(), 25), startTime: "18:00", endTime: "20:00", status: "completed", isActive: true, cost: "0", registrationRequired: false, maxParticipants: 40 },
+      { title: "Guru Purnima Celebration", description: "Annual Guru Purnima", eventType: "festival", location: "Vadodara", startDate: new Date(now.getFullYear(), now.getMonth(), 28), endDate: new Date(now.getFullYear(), now.getMonth(), 28), startTime: "09:00", endTime: "21:00", status: "completed", isActive: true, cost: "0", registrationRequired: true, maxParticipants: 150 },
+      { title: "Upcoming Satsang", description: "Next week satsang", eventType: "satsang", location: "Ahmedabad", startDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7), endDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7), startTime: "18:00", endTime: "20:00", status: "planned", isActive: true, cost: "0", registrationRequired: false, maxParticipants: 50 },
+    ];
+    const seededEvents: any[] = [];
+    for (const e of eventData) {
+      const created = await storage.createEvent(e);
+      seededEvents.push(created);
+    }
+
+    // Seed Attendance
+    for (let i = 0; i < seededEvents.length; i++) {
+      const event = seededEvents[i];
+      if (event.status === "completed") {
+        for (let j = 0; j < seededDevotees.length; j++) {
+          const present = Math.random() > 0.2;
+          await storage.createAttendance({
+            devoteeId: seededDevotees[j].id,
+            eventId: event.id,
+            attendanceDate: event.startDate,
+            status: present ? "present" : "absent",
+            checkInTime: present ? `${event.startTime}:00` : null,
+            notes: present ? "Attended" : "Could not attend",
+          });
+        }
+      }
+    }
+
+    // Seed Donations
+    const donationTypes = ["General", "Festival", "Building Fund", "Education", "Medical"];
+    const paymentMethods = ["Cash", "Bank Transfer", "Online"];
+    for (let i = 0; i < seededDevotees.length; i++) {
+      const numDonations = Math.floor(Math.random() * 3) + 1;
+      for (let j = 0; j < numDonations; j++) {
+        const amount = Math.floor(Math.random() * 50) * 100 + 500;
+        await storage.createDonation({
+          devoteeId: seededDevotees[i].id,
+          amount: String(amount),
+          donationType: donationTypes[Math.floor(Math.random() * donationTypes.length)],
+          paymentMethod: paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
+          donationDate: new Date(now.getFullYear(), now.getMonth(), Math.floor(Math.random() * 28) + 1),
+          receiptNumber: `REC-${seededDevotees[i].id}-${j + 1}`,
+          notes: "Seeded donation",
+        });
+      }
+    }
+
+    // Seed Volunteering
+    const activities = ["Event Setup", "Cooking", "Kirtan", "Registration", "Clean-up", "Decoration", "Photography", "Medical Support"];
+    for (let i = 0; i < seededDevotees.length; i++) {
+      const numActivities = Math.floor(Math.random() * 3) + 1;
+      for (let j = 0; j < numActivities; j++) {
+        const hours = Math.floor(Math.random() * 4) + 2;
+        await storage.createVolunteering({
+          devoteeId: seededDevotees[i].id,
+          activityType: activities[Math.floor(Math.random() * activities.length)],
+          startDate: new Date(now.getFullYear(), now.getMonth(), Math.floor(Math.random() * 28) + 1),
+          hoursCompleted: hours,
+          description: "Seeded seva activity",
+          status: "completed",
+        });
+      }
+    }
+
+    // Seed Group Memberships
+    const createdGroups = await storage.getGroups();
+    const sabhaGroup = createdGroups.find(g => g.groupName === "Sabha List");
+    if (sabhaGroup) {
+      for (const dev of seededDevotees) {
+        await storage.createGroupMembership({
+          groupId: sabhaGroup.id,
+          devoteeId: dev.id,
+          joinedDate: new Date(),
+          status: "active",
+          notes: "Auto-seeded",
+        });
       }
     }
 

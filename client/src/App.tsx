@@ -29,6 +29,8 @@ import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 import IDCardGenerator from "@/pages/IDCardGenerator";
 import DevoteeProfilePage from "@/pages/DevoteeProfilePage";
+import EventDetailPage from "@/pages/EventDetailPage";
+import FamilyDetailPage from "@/pages/FamilyDetailPage";
 import DevStudio from "@/pages/DevStudio";
 import DashboardDesigner from "@/components/Dashboard/DashboardDesigner";
 import DynamicPage from "@/pages/DynamicPage";
@@ -128,6 +130,8 @@ function AppContent() {
               <AdminRoute component={DevStudio} />
             </Route>
             <Route path="/devotees/:id" component={DevoteeProfilePage} />
+            <Route path="/events/:id" component={EventDetailPage} />
+            <Route path="/families/:id" component={FamilyDetailPage} />
             <Route path="/id-cards" component={IDCardGenerator} />
             <Route path="/settings" component={Settings} />
             <Route path="/page/:slug" component={DynamicPage} />
