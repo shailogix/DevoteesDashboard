@@ -12,6 +12,13 @@ export function useAuth() {
     refetchOnWindowFocus: false,
   });
 
+  const { data: permissions } = useQuery<any>({
+    queryKey: ["/api/users/me/permissions"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    retry: false,
+    enabled: !!user,
+  });
+
   const logout = async () => {
     try {
       await fetch("/api/logout", { method: "GET", credentials: "include" });
@@ -22,11 +29,23 @@ export function useAuth() {
     }
   };
 
+  const isAdmin = user?.role === "admin";
+  const hasRole = (role: string) => user?.role === role;
+  const canSeePage = (pageId: string) => {
+    if (isAdmin) return true;
+    const visiblePages = permissions?.visiblePages || [];
+    return visiblePages.includes(pageId);
+  };
+
   return {
     user,
     isLoading,
     isAuthenticated: !!user && !error,
     error,
     logout,
+    isAdmin,
+    hasRole,
+    canSeePage,
+    permissions,
   };
 }

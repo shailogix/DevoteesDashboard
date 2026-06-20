@@ -247,42 +247,53 @@ The app must auto-discover all pages in `page_registry` on startup and register 
 
 ---
 
-## Phase 3: Complete Role-Based Access Control
+## Phase 3: Complete Role-Based Access Control ✅ COMPLETE
 
 ### Problem
 Anyone who logs in has full access. The `role` field is only displayed on the sidebar.
 
 ### Solution
 
-1. **Create `requireAdmin` and `requireRole` middleware**
-   - Check `req.user.role` from the Replit Auth session
-   - Return 403 for unauthorized access
+1. **Create `requireAdmin` and `requireRole` middleware** ✅
+   - `server/replitAuth.ts`: `requireAdmin` checks `req.user.role === "admin"` and returns 403
+   - `requireRole(role)` generic middleware for any role
+   - Session enrichment on every authenticated request: `user.role` and `user.isAdmin` populated from DB
 
-2. **Protect all admin endpoints**
-   - All `/api/admin/*` and `/api/dev-config/*` routes → require `admin` role
-   - GOD Mode endpoints → require `admin` role
-   - Dynamic route generator → require `admin` role
-   - Schema builder → require `admin` role
+2. **Protect all admin endpoints** ✅
+   - All 65 `/api/admin/*` routes → `isAuthenticated, requireAdmin`
+   - All `/api/dev-config/*` routes → `isAuthenticated, requireAdmin`
+   - `/api/admin/activate` (GOD Mode) → `requireAdmin`
+   - Removed old `requireGodModeToken` local middleware
 
-3. **Protect DevStudio page**
-   - Only accessible to `admin` role
-   - Show 403 or redirect for non-admin users
+3. **Protect DevStudio page** ✅
+   - `AdminRoute` component in `App.tsx` redirects non-admin users to `/`
+   - `/dev-studio` route wrapped with `AdminRoute`
 
-4. **Feature-level permissions**
-   - Some pages can be restricted to `admin` only (e.g., Analytics, DevStudio)
-   - Some pages visible to all logged-in users
-   - Configurable per-page in `page_registry`
+4. **Feature-level permissions** ✅
+   - `useAuth.ts` exposes `isAdmin`, `hasRole()`, `canSeePage()`, and `permissions`
+   - Sidebar hides `analytics` and `id-cards` for non-admin users
+   - Sidebar nav items filtered by `canSeePage()` for config-based permissions
+   - Dev Mode button hidden for non-admin users
 
-5. **First user admin elevation**
-   - The first user to log in is auto-promoted to `admin`
-   - Admin users can promote/demote other users from the DevStudio
+5. **First user admin elevation** ✅
+   - `upsertUser()` in `replitAuth.ts`: first user auto-promoted to `admin` role
+   - Admin users can promote/demote other users via `PATCH /api/users/:id/role`
 
 ### New API Routes
 ```
 GET /api/users — List all users (admin only)
 PATCH /api/users/:id/role — Change user role (admin only)
-GET /api/users/me/permissions — Get my permissions
+GET /api/users/me/permissions — Get my permissions (role, isAdmin, visiblePages, canEdit, canDelete)
 ```
+
+### Files Modified
+- `server/replitAuth.ts` — Session enrichment + middleware
+- `server/routes.ts` — All admin endpoints protected
+- `server/storage.ts` — User management interface
+- `client/src/hooks/useAuth.ts` — RBAC helpers
+- `client/src/App.tsx` — AdminRoute + DevStudio protection
+- `client/src/components/Layout/Sidebar.tsx` — Role-based nav filtering
+- `client/src/contexts/DevModeContext.tsx` — Admin-only dev mode check
 
 ---
 

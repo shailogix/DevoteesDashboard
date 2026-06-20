@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { MemoryStorage } from "./memoryStorage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated, requireAdmin } from "./replitAuth";
 import { devConfig } from "./devConfig";
 
 import { randomBytes } from "crypto";
@@ -10,17 +10,6 @@ import { randomBytes } from "crypto";
 // GOD Mode session management — server-side authorization for privileged admin endpoints
 const godModeTokens = new Set<string>();
 const GOD_MODE_PASSWORD = "DevelopZ";
-
-const requireGodMode = (req: any, res: any, next: any) => {
-  const token = req.headers['x-god-mode-token'] as string | undefined;
-  if (!token || !godModeTokens.has(token)) {
-    return res.status(403).json({
-      message: "GOD Mode access required. Activate Developer Mode to access this endpoint.",
-      code: "GOD_MODE_REQUIRED"
-    });
-  }
-  next();
-};
 
 const addAudit = async (action: string, entity: string, entityId: any, userId: string, before: any, after: any) => {
   try {
@@ -68,6 +57,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // ─── USER MANAGEMENT (ADMIN ONLY) ──────────────────────────────────────────
+  app.get('/api/users', isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.get('/api/users/me/permissions', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      const roleProfiles = (await devConfig.get('roleProfiles')) || {};
+      const profile = roleProfiles[user.role] || roleProfiles['user'] || { visiblePages: [], canEdit: false, canDelete: false };
+      res.json({
+        userId: user.id,
+        role: user.role,
+        isAdmin: user.role === "admin",
+        visiblePages: profile.visiblePages || [],
+        canEdit: profile.canEdit || false,
+        canDelete: profile.canDelete || false,
+      });
+    } catch (error) {
+      console.error("Error fetching permissions:", error);
+      res.status(500).json({ message: "Failed to fetch permissions" });
+    }
+  });
+
+  app.patch('/api/users/:id/role', isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const id = req.params.id;
+      const { role } = req.body;
+      if (!role || !['admin', 'manager', 'user', 'volunteer'].includes(role)) {
+        return res.status(400).json({ message: "Invalid role. Must be one of: admin, manager, user, volunteer" });
+      }
+      const currentUser = await storage.getUser(req.user?.claims?.sub);
+      if (id === currentUser?.id) {
+        return res.status(400).json({ message: "Cannot change your own role" });
+      }
+      const updated = await storage.updateUserRole(id, role);
+      await addAudit("UPDATE_ROLE", "user", id, req.user?.claims?.sub || "system", currentUser?.role, role);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating role:", error);
+      res.status(500).json({ message: "Failed to update role" });
     }
   });
 
@@ -761,7 +802,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/devotees/:id/documents', requireGodMode, async (req, res) => {
+  app.post('/api/devotees/:id/documents', requireAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const { type, filename, base64 } = req.body;
@@ -776,7 +817,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/devotees/:id/documents/:docId', requireGodMode, async (req, res) => {
+  app.delete('/api/devotees/:id/documents/:docId', requireAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const { docId } = req.params;
@@ -813,7 +854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await devConfig.init();
 
   // ─── GOD MODE SESSION ACTIVATION ────────────────────────────────────────────
-  app.post('/api/admin/activate', isAuthenticated, async (req, res) => {
+  app.post('/api/admin/activate', isAuthenticated, requireAdmin, async (req, res) => {
     const { password } = req.body;
     if (password !== GOD_MODE_PASSWORD) {
       return res.status(401).json({ message: "Invalid GOD Mode password" });
@@ -823,47 +864,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ token, message: "GOD Mode activated" });
   });
 
-  app.delete('/api/admin/activate', (req, res) => {
+  app.delete('/api/admin/activate', isAuthenticated, requireAdmin, (req, res) => {
     const token = req.headers['x-god-mode-token'] as string | undefined;
     if (token) godModeTokens.delete(token);
     res.json({ message: "GOD Mode deactivated" });
   });
 
-  app.get('/api/dev-config', isAuthenticated, async (req, res) => {
+  app.get('/api/dev-config', isAuthenticated, requireAdmin, async (req, res) => {
     res.json(devConfig.getAll());
   });
 
-  app.put('/api/dev-config', isAuthenticated, async (req, res) => {
+  app.put('/api/dev-config', isAuthenticated, requireAdmin, async (req, res) => {
     await devConfig.import(req.body);
     res.json(devConfig.getAll());
   });
 
-  app.patch('/api/dev-config/app-info', isAuthenticated, async (req, res) => {
+  app.patch('/api/dev-config/app-info', isAuthenticated, requireAdmin, async (req, res) => {
     await devConfig.patch('appInfo', req.body);
     res.json(devConfig.get('appInfo'));
   });
 
-  app.patch('/api/dev-config/navigation', isAuthenticated, async (req, res) => {
+  app.patch('/api/dev-config/navigation', isAuthenticated, requireAdmin, async (req, res) => {
     await devConfig.patch('navigation', req.body);
     res.json(devConfig.get('navigation'));
   });
 
-  app.patch('/api/dev-config/theme', isAuthenticated, async (req, res) => {
+  app.patch('/api/dev-config/theme', isAuthenticated, requireAdmin, async (req, res) => {
     await devConfig.patch('theme', req.body);
     res.json(devConfig.get('theme'));
   });
 
-  app.patch('/api/dev-config/custom-fields', isAuthenticated, async (req, res) => {
+  app.patch('/api/dev-config/custom-fields', isAuthenticated, requireAdmin, async (req, res) => {
     await devConfig.set('customFields', req.body.fields);
     res.json(devConfig.get('customFields'));
   });
 
-  app.patch('/api/dev-config/role-profiles', isAuthenticated, async (req, res) => {
+  app.patch('/api/dev-config/role-profiles', isAuthenticated, requireAdmin, async (req, res) => {
     await devConfig.patch('roleProfiles', req.body);
     res.json(devConfig.get('roleProfiles'));
   });
 
-  app.post('/api/dev-config/snapshot', isAuthenticated, async (req, res) => {
+  app.post('/api/dev-config/snapshot', isAuthenticated, requireAdmin, async (req, res) => {
     const { name } = req.body;
     const snapshot = {
       id: `snap_${Date.now()}`,
@@ -884,7 +925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(snapshot);
   });
 
-  app.post('/api/dev-config/restore/:snapshotId', isAuthenticated, async (req, res) => {
+  app.post('/api/dev-config/restore/:snapshotId', isAuthenticated, requireAdmin, async (req, res) => {
     const snapshots = devConfig.get('snapshots') || [];
     const snap = snapshots.find((s: any) => s.id === req.params.snapshotId);
     if (!snap) return res.status(404).json({ message: "Snapshot not found" });
@@ -892,7 +933,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ message: "Restored", config: snap.config });
   });
 
-  app.get('/api/dev-config/export', isAuthenticated, async (req, res) => {
+  app.get('/api/dev-config/export', isAuthenticated, requireAdmin, async (req, res) => {
     const exportData = {
       version: "1.0",
       exportedAt: new Date().toISOString(),
@@ -907,7 +948,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(exportData);
   });
 
-  app.post('/api/dev-config/import', isAuthenticated, async (req, res) => {
+  app.post('/api/dev-config/import', isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const { appInfo, navigation, theme, customFields, roleProfiles } = req.body;
       const updates: Record<string, any> = {};
@@ -924,7 +965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ─── GOD MODE: AUDIT LOG ───────────────────────────────────────────────────
-  app.get('/api/admin/audit', isAuthenticated, async (req: any, res) => {
+  app.get('/api/admin/audit', isAuthenticated, requireAdmin, async (req: any, res) => {
     try {
       const { entity, action, limit = "100" } = req.query;
       const logs = await storage.getAuditLog(Number(limit), entity, action);
@@ -935,7 +976,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ─── GOD MODE: MACROS ──────────────────────────────────────────────────────
-  app.get('/api/admin/macros', isAuthenticated, async (_req, res) => {
+  app.get('/api/admin/macros', isAuthenticated, requireAdmin, async (_req, res) => {
     try {
       const macros = await storage.getDevMacros();
       res.json(macros);
@@ -944,7 +985,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/admin/macros', isAuthenticated, async (req: any, res) => {
+  app.post('/api/admin/macros', isAuthenticated, requireAdmin, async (req: any, res) => {
     try {
       const macro = await storage.createDevMacro({
         name: req.body.name,
@@ -957,7 +998,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/admin/macros/:id', isAuthenticated, async (req: any, res) => {
+  app.put('/api/admin/macros/:id', isAuthenticated, requireAdmin, async (req: any, res) => {
     try {
       const macro = await storage.updateDevMacro(Number(req.params.id), {
         name: req.body.name,
@@ -970,7 +1011,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/admin/macros/:id', isAuthenticated, async (req, res) => {
+  app.delete('/api/admin/macros/:id', isAuthenticated, requireAdmin, async (req, res) => {
     try {
       await storage.deleteDevMacro(Number(req.params.id));
       res.json({ message: "Macro deleted" });
@@ -979,7 +1020,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/admin/macros/:id/run', isAuthenticated, async (req: any, res) => {
+  app.post('/api/admin/macros/:id/run', isAuthenticated, requireAdmin, async (req: any, res) => {
     try {
       const macro = await storage.getDevMacro(Number(req.params.id));
       if (!macro) return res.status(404).json({ message: "Macro not found" });
@@ -1015,7 +1056,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ─── GOD MODE: BULK OPERATIONS ─────────────────────────────────────────────
-  app.post('/api/admin/bulk', isAuthenticated, async (req: any, res) => {
+  app.post('/api/admin/bulk', isAuthenticated, requireAdmin, async (req: any, res) => {
     const { entity, operation, ids, data } = req.body;
     const userId = req.user?.claims?.sub || "system";
     const results: any[] = [];
@@ -1055,7 +1096,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ─── GOD MODE: FULL DATA EXPORT ────────────────────────────────────────────
-  app.get('/api/admin/export/data', isAuthenticated, async (req, res) => {
+  app.get('/api/admin/export/data', isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const [devotees, families, events, attendance, donations, volunteering, mentors, groups, mandals, locations] = await Promise.all([
         storage.getDevotees(),
@@ -1085,7 +1126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ─── GOD MODE: FULL DATA IMPORT ────────────────────────────────────────────
-  app.post('/api/admin/import/data', isAuthenticated, async (req: any, res) => {
+  app.post('/api/admin/import/data', isAuthenticated, requireAdmin, async (req: any, res) => {
     try {
       const { data } = req.body;
       const userId = req.user?.claims?.sub || "system";
@@ -1113,7 +1154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ─── GOD MODE: RELATIONAL DATA ─────────────────────────────────────────────
-  app.get('/api/admin/relations/:entity/:id', isAuthenticated, async (req, res) => {
+  app.get('/api/admin/relations/:entity/:id', isAuthenticated, requireAdmin, async (req, res) => {
     const { entity, id } = req.params;
     const numId = Number(id);
     try {
@@ -1148,7 +1189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ─── GOD MODE: LINK DEVOTEE TO FAMILY/MENTOR ──────────────────────────────
-  app.patch('/api/admin/link', isAuthenticated, async (req: any, res) => {
+  app.patch('/api/admin/link', isAuthenticated, requireAdmin, async (req: any, res) => {
     const { devoteeId, familyId, mentorId } = req.body;
     const userId = req.user?.claims?.sub || "system";
     try {
@@ -1228,7 +1269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ─── ADMIN: QUERY CONSOLE ───────────────────────────────────────────────────
-  app.get('/api/admin/query', isAuthenticated, async (req, res) => {
+  app.get('/api/admin/query', isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const { entity = "devotees", search = "", limit = "100" } = req.query as any;
       let data: any[] = [];
@@ -1254,10 +1295,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ─── ADMIN: FEATURE FLAGS ───────────────────────────────────────────────────
-  app.get('/api/admin/feature-flags', isAuthenticated, async (_req, res) => {
+  app.get('/api/admin/feature-flags', isAuthenticated, requireAdmin, async (_req, res) => {
     res.json(devConfig.get('featureFlags'));
   });
-  app.patch('/api/admin/feature-flags', isAuthenticated, requireGodMode, async (req, res) => {
+  app.patch('/api/admin/feature-flags', isAuthenticated, requireAdmin, async (req, res) => {
     const allowed = ['donations','analytics','volunteering','idCards','groups','mentors','events','attendance'];
     const current = devConfig.get('featureFlags') || {};
     for (const key of allowed) {
@@ -1270,10 +1311,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ─── ADMIN: RECEIPT TEMPLATE ────────────────────────────────────────────────
-  app.get('/api/admin/receipt-template', isAuthenticated, async (_req, res) => {
+  app.get('/api/admin/receipt-template', isAuthenticated, requireAdmin, async (_req, res) => {
     res.json(devConfig.get('receiptTemplate'));
   });
-  app.patch('/api/admin/receipt-template', isAuthenticated, requireGodMode, async (req, res) => {
+  app.patch('/api/admin/receipt-template', isAuthenticated, requireAdmin, async (req, res) => {
     const current = devConfig.get('receiptTemplate') || {};
     const updated = { ...current, ...req.body };
     await devConfig.set('receiptTemplate', updated);
@@ -1281,17 +1322,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ─── ADMIN: ANALYTICS DASHBOARDS ────────────────────────────────────────────
-  app.get('/api/admin/analytics-dashboards', isAuthenticated, async (_req, res) => {
+  app.get('/api/admin/analytics-dashboards', isAuthenticated, requireAdmin, async (_req, res) => {
     res.json(devConfig.get('analyticsDashboards'));
   });
-  app.post('/api/admin/analytics-dashboards', isAuthenticated, requireGodMode, async (req, res) => {
+  app.post('/api/admin/analytics-dashboards', isAuthenticated, requireAdmin, async (req, res) => {
     const dashboard = { ...req.body, id: `dash_${Date.now()}` };
     const dashboards = devConfig.get('analyticsDashboards') || [];
     dashboards.push(dashboard);
     await devConfig.set('analyticsDashboards', dashboards);
     res.json(dashboard);
   });
-  app.put('/api/admin/analytics-dashboards/:id', isAuthenticated, requireGodMode, async (req, res) => {
+  app.put('/api/admin/analytics-dashboards/:id', isAuthenticated, requireAdmin, async (req, res) => {
     const dashboards = devConfig.get('analyticsDashboards') || [];
     const idx = dashboards.findIndex((d: any) => d.id === req.params.id);
     if (idx === -1) return res.status(404).json({ message: 'Dashboard not found' });
@@ -1299,24 +1340,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await devConfig.set('analyticsDashboards', dashboards);
     res.json(dashboards[idx]);
   });
-  app.delete('/api/admin/analytics-dashboards/:id', isAuthenticated, requireGodMode, async (req, res) => {
+  app.delete('/api/admin/analytics-dashboards/:id', isAuthenticated, requireAdmin, async (req, res) => {
     const dashboards = (devConfig.get('analyticsDashboards') || []).filter((d: any) => d.id !== req.params.id);
     await devConfig.set('analyticsDashboards', dashboards);
     res.json({ deleted: true });
   });
 
   // ─── ADMIN: CARD THEMES ──────────────────────────────────────────────────────
-  app.get('/api/admin/card-themes', isAuthenticated, async (_req, res) => {
+  app.get('/api/admin/card-themes', isAuthenticated, requireAdmin, async (_req, res) => {
     res.json(devConfig.get('cardThemes'));
   });
-  app.post('/api/admin/card-themes', isAuthenticated, requireGodMode, async (req, res) => {
+  app.post('/api/admin/card-themes', isAuthenticated, requireAdmin, async (req, res) => {
     const theme = { ...req.body, id: `theme_${Date.now()}` };
     const themes = devConfig.get('cardThemes') || [];
     themes.push(theme);
     await devConfig.set('cardThemes', themes);
     res.json(theme);
   });
-  app.put('/api/admin/card-themes/:id', isAuthenticated, requireGodMode, async (req, res) => {
+  app.put('/api/admin/card-themes/:id', isAuthenticated, requireAdmin, async (req, res) => {
     const themes = devConfig.get('cardThemes') || [];
     const idx = themes.findIndex((t: any) => t.id === req.params.id);
     if (idx === -1) return res.status(404).json({ message: 'Theme not found' });
@@ -1324,29 +1365,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await devConfig.set('cardThemes', themes);
     res.json(themes[idx]);
   });
-  app.delete('/api/admin/card-themes/:id', isAuthenticated, requireGodMode, async (req, res) => {
+  app.delete('/api/admin/card-themes/:id', isAuthenticated, requireAdmin, async (req, res) => {
     const themes = (devConfig.get('cardThemes') || []).filter((t: any) => t.id !== req.params.id);
     await devConfig.set('cardThemes', themes);
     res.json({ deleted: true });
   });
 
   // ─── ADMIN: VISUAL OVERRIDES ────────────────────────────────────────────────
-  app.get('/api/admin/visual-overrides', isAuthenticated, async (_req, res) => {
+  app.get('/api/admin/visual-overrides', isAuthenticated, requireAdmin, async (_req, res) => {
     res.json(devConfig.get('visualOverrides') || {});
   });
-  app.patch('/api/admin/visual-overrides', isAuthenticated, requireGodMode, async (req, res) => {
+  app.patch('/api/admin/visual-overrides', isAuthenticated, requireAdmin, async (req, res) => {
     const current = devConfig.get('visualOverrides') || {};
     const updated = { ...current, ...req.body };
     await devConfig.set('visualOverrides', updated);
     res.json(updated);
   });
-  app.delete('/api/admin/visual-overrides', isAuthenticated, requireGodMode, async (_req, res) => {
+  app.delete('/api/admin/visual-overrides', isAuthenticated, requireAdmin, async (_req, res) => {
     await devConfig.set('visualOverrides', {});
     res.json({ cleared: true });
   });
 
   // ─── ADMIN: ROLLBACK SLOTS (5-slot circular buffer) ──────────────────────
-  app.get('/api/admin/rollback-slots', isAuthenticated, async (_req, res) => {
+  app.get('/api/admin/rollback-slots', isAuthenticated, requireAdmin, async (_req, res) => {
     const slots = devConfig.get('rollbackSlots') || [];
     const nextIndex = devConfig.get('rollbackNextIndex') || 0;
     res.json({
@@ -1355,7 +1396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       currentOverrides: devConfig.get('visualOverrides') || {},
     });
   });
-  app.post('/api/admin/rollback-slots', isAuthenticated, requireGodMode, async (req, res) => {
+  app.post('/api/admin/rollback-slots', isAuthenticated, requireAdmin, async (req, res) => {
     const { name } = req.body;
     const nextIndex = devConfig.get('rollbackNextIndex') || 0;
     const slotIndex = nextIndex % 5;
@@ -1376,7 +1417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await devConfig.set('rollbackNextIndex', nextIndex + 1);
     res.json(slot);
   });
-  app.post('/api/admin/rollback-slots/:index/restore', isAuthenticated, requireGodMode, async (req, res) => {
+  app.post('/api/admin/rollback-slots/:index/restore', isAuthenticated, requireAdmin, async (req, res) => {
     const idx = parseInt(req.params.index);
     const slots = devConfig.get('rollbackSlots') || [];
     const slot = slots.find((s: any) => s.index === idx);
@@ -1386,65 +1427,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ─── ADMIN: PAGE REGISTRY ───────────────────────────────────────────────────
-  app.get('/api/admin/page-registry', isAuthenticated, async (_req, res) => {
+  app.get('/api/admin/page-registry', isAuthenticated, requireAdmin, async (_req, res) => {
     try { res.json(await storage.getPageRegistry()); } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
-  app.post('/api/admin/page-registry', isAuthenticated, requireGodMode, async (req, res) => {
+  app.post('/api/admin/page-registry', isAuthenticated, requireAdmin, async (req, res) => {
     try { const entry = await storage.createPageRegistryEntry(req.body); res.json(entry); } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
-  app.get('/api/admin/page-registry/:id', isAuthenticated, async (req, res) => {
+  app.get('/api/admin/page-registry/:id', isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const entry = await storage.getPageRegistryEntry(Number(req.params.id));
       if (!entry) return res.status(404).json({ message: "Page not found" });
       res.json(entry);
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
-  app.put('/api/admin/page-registry/:id', isAuthenticated, requireGodMode, async (req, res) => {
+  app.put('/api/admin/page-registry/:id', isAuthenticated, requireAdmin, async (req, res) => {
     try { const entry = await storage.updatePageRegistryEntry(Number(req.params.id), req.body); res.json(entry); } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
-  app.delete('/api/admin/page-registry/:id', isAuthenticated, requireGodMode, async (req, res) => {
+  app.delete('/api/admin/page-registry/:id', isAuthenticated, requireAdmin, async (req, res) => {
     try { await storage.deletePageRegistryEntry(Number(req.params.id)); res.json({ deleted: true }); } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
   // ─── ADMIN: SCHEMA REGISTRY ─────────────────────────────────────────────────
-  app.get('/api/admin/schema-registry', isAuthenticated, async (_req, res) => {
+  app.get('/api/admin/schema-registry', isAuthenticated, requireAdmin, async (_req, res) => {
     try { res.json(await storage.getSchemaRegistry()); } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
-  app.post('/api/admin/schema-registry', isAuthenticated, requireGodMode, async (req, res) => {
+  app.post('/api/admin/schema-registry', isAuthenticated, requireAdmin, async (req, res) => {
     try { const entry = await storage.createSchemaRegistryEntry(req.body); res.json(entry); } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
-  app.get('/api/admin/schema-registry/:id', isAuthenticated, async (req, res) => {
+  app.get('/api/admin/schema-registry/:id', isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const entry = await storage.getSchemaRegistryEntry(Number(req.params.id));
       if (!entry) return res.status(404).json({ message: "Schema not found" });
       res.json(entry);
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
-  app.put('/api/admin/schema-registry/:id', isAuthenticated, requireGodMode, async (req, res) => {
+  app.put('/api/admin/schema-registry/:id', isAuthenticated, requireAdmin, async (req, res) => {
     try { const entry = await storage.updateSchemaRegistryEntry(Number(req.params.id), req.body); res.json(entry); } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
-  app.delete('/api/admin/schema-registry/:id', isAuthenticated, requireGodMode, async (req, res) => {
+  app.delete('/api/admin/schema-registry/:id', isAuthenticated, requireAdmin, async (req, res) => {
     try { await storage.deleteSchemaRegistryEntry(Number(req.params.id)); res.json({ deleted: true }); } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
   // ─── ADMIN: ROUTE REGISTRY ──────────────────────────────────────────────────
-  app.get('/api/admin/route-registry', isAuthenticated, async (_req, res) => {
+  app.get('/api/admin/route-registry', isAuthenticated, requireAdmin, async (_req, res) => {
     try { res.json(await storage.getRouteRegistry()); } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
-  app.post('/api/admin/route-registry', isAuthenticated, requireGodMode, async (req, res) => {
+  app.post('/api/admin/route-registry', isAuthenticated, requireAdmin, async (req, res) => {
     try { const entry = await storage.createRouteRegistryEntry(req.body); res.json(entry); } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
-  app.get('/api/admin/route-registry/:id', isAuthenticated, async (req, res) => {
+  app.get('/api/admin/route-registry/:id', isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const entry = await storage.getRouteRegistryEntry(Number(req.params.id));
       if (!entry) return res.status(404).json({ message: "Route not found" });
       res.json(entry);
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
-  app.put('/api/admin/route-registry/:id', isAuthenticated, requireGodMode, async (req, res) => {
+  app.put('/api/admin/route-registry/:id', isAuthenticated, requireAdmin, async (req, res) => {
     try { const entry = await storage.updateRouteRegistryEntry(Number(req.params.id), req.body); res.json(entry); } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
-  app.delete('/api/admin/route-registry/:id', isAuthenticated, requireGodMode, async (req, res) => {
+  app.delete('/api/admin/route-registry/:id', isAuthenticated, requireAdmin, async (req, res) => {
     try { await storage.deleteRouteRegistryEntry(Number(req.params.id)); res.json({ deleted: true }); } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
@@ -1478,7 +1519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ─── ADMIN: SEED MANAGER ────────────────────────────────────────────────────
-  app.get('/api/admin/seed/counts', isAuthenticated, async (_req, res) => {
+  app.get('/api/admin/seed/counts', isAuthenticated, requireAdmin, async (_req, res) => {
     try {
       const [devotees, families, events, attendance, donations, volunteering, mentors, groups] = await Promise.all([
         storage.getDevotees(), storage.getFamilies(), storage.getEvents(),
@@ -1492,7 +1533,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
-  app.post('/api/admin/seed/reset', isAuthenticated, requireGodMode, async (req: any, res) => {
+  app.post('/api/admin/seed/reset', isAuthenticated, requireAdmin, async (req: any, res) => {
     try {
       const ms = (storage as any).memStore;
       if (ms && ms.resetAndReseed) {
@@ -1504,7 +1545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
-  app.post('/api/admin/seed/add', isAuthenticated, requireGodMode, async (req: any, res) => {
+  app.post('/api/admin/seed/add', isAuthenticated, requireAdmin, async (req: any, res) => {
     try {
       const { count = 5, entity = "devotees" } = req.body;
       const userId = req.user?.claims?.sub || "god-mode";

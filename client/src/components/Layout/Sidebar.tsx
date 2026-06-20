@@ -163,7 +163,7 @@ function AddGroupDialog({
 
 export function Sidebar() {
   const [location] = useLocation();
-  const { user } = useAuth();
+  const { user, isAdmin, canSeePage } = useAuth();
   const { isDevMode, showDevLogin, deactivateDevMode } = useDevMode();
   const [groupsOpen, setGroupsOpen] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
@@ -200,15 +200,26 @@ export function Sidebar() {
         .filter((n: any) => n.visible)
     : DEFAULT_NAVIGATION;
 
+  const ADMIN_ONLY_PAGES = ["analytics", "id-cards"];
+
   const navItems = featureFlags
     ? rawNavItems.filter((item) => {
         const flagKey = Object.entries(FLAG_TO_NAV_ID).find(
           ([, navId]) => navId === item.id
         )?.[0];
         if (!flagKey) return true;
-        return featureFlags[flagKey] !== false;
+        if (featureFlags[flagKey] === false) return false;
+        // Role-based filtering: hide admin-only pages for non-admins
+        if (!isAdmin && ADMIN_ONLY_PAGES.includes(item.id)) return false;
+        // Config-based page permissions from devConfig
+        if (!isAdmin && !canSeePage(item.id)) return false;
+        return true;
       })
-    : rawNavItems;
+    : rawNavItems.filter((item) => {
+        if (!isAdmin && ADMIN_ONLY_PAGES.includes(item.id)) return false;
+        if (!isAdmin && !canSeePage(item.id)) return false;
+        return true;
+      });
 
   const getNavItemClass = (href: string) => {
     const isActive = location === href;
@@ -384,32 +395,34 @@ export function Sidebar() {
         )}
       </nav>
 
-      {/* Developer Mode Toggle */}
-      <div className="px-4 pb-3">
-        {isDevMode ? (
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full border-yellow-400 text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
-            onClick={deactivateDevMode}
-            data-testid="button-exit-dev-mode"
-          >
-            <Code2 className="w-4 h-4 mr-2" />
-            Exit Dev Mode
-          </Button>
-        ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full text-muted-foreground hover:text-foreground"
-            onClick={showDevLogin}
-            data-testid="button-enter-dev-mode"
-          >
-            <Code2 className="w-4 h-4 mr-2" />
-            Developer Mode
-          </Button>
-        )}
-      </div>
+      {/* Developer Mode Toggle — admin only */}
+      {isAdmin && (
+        <div className="px-4 pb-3">
+          {isDevMode ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full border-yellow-400 text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
+              onClick={deactivateDevMode}
+              data-testid="button-exit-dev-mode"
+            >
+              <Code2 className="w-4 h-4 mr-2" />
+              Exit Dev Mode
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-muted-foreground hover:text-foreground"
+              onClick={showDevLogin}
+              data-testid="button-enter-dev-mode"
+            >
+              <Code2 className="w-4 h-4 mr-2" />
+              Developer Mode
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* User Profile */}
       <div className="p-4 border-t border-border">

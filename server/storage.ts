@@ -73,7 +73,9 @@ import { eq, desc, and, gte, lte, count, sum, sql } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUserRole(id: string, role: string): Promise<User>;
 
   getDevotees(): Promise<Devotee[]>;
   getDevotee(id: number): Promise<Devotee | undefined>;
@@ -214,6 +216,10 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
   async upsertUser(userData: UpsertUser): Promise<User> {
     const [user] = await db
       .insert(users)
@@ -224,6 +230,15 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  async updateUserRole(id: string, role: string): Promise<User> {
+    const [updatedUser] = await db
+      .update(users)
+      .set({ role, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser;
   }
 
   async getDevotees(): Promise<Devotee[]> {
@@ -982,6 +997,9 @@ class FallbackStorage implements IStorage {
 
   async getUserPreferences(userId: string) { return this.executeWithFallback(s => s.getUserPreferences(userId)); }
   async upsertUserPreferences(preferences: InsertUserPreferences) { return this.executeWithFallback(s => s.upsertUserPreferences(preferences)); }
+
+  async getAllUsers() { return this.executeWithFallback(s => s.getAllUsers()); }
+  async updateUserRole(id: string, role: string) { return this.executeWithFallback(s => s.updateUserRole(id, role)); }
 
   async getStats() { return this.executeWithFallback(s => s.getStats()); }
   async getDonationTrends() { return this.executeWithFallback(s => s.getDonationTrends()); }

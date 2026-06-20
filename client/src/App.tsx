@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -46,8 +46,38 @@ function EditModeCursor() {
   return null;
 }
 
+function AdminRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isAdmin, isLoading } = useAuth();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && !isAdmin) {
+      navigate("/");
+    }
+  }, [isLoading, isAdmin, navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center mx-auto animate-pulse">
+            <span className="text-primary-foreground text-2xl font-bold">॥</span>
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold text-foreground">Madhav Parivar</h1>
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) return null;
+  return <Component />;
+}
+
 function AppContent() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isAdmin } = useAuth();
   const { isDevMode } = useDevMode();
 
   if (isLoading) {
@@ -86,7 +116,9 @@ function AppContent() {
             <Route path="/volunteering" component={Volunteering} />
             <Route path="/analytics" component={Analytics} />
             <Route path="/dashboard-designer" component={DashboardDesigner} />
-            <Route path="/dev-studio" component={DevStudio} />
+            <Route path="/dev-studio">
+              <AdminRoute component={DevStudio} />
+            </Route>
             <Route path="/devotees/:id" component={DevoteeProfilePage} />
             <Route path="/id-cards" component={IDCardGenerator} />
             <Route path="/settings" component={Settings} />

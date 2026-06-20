@@ -57,13 +57,17 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
-  await storage.upsertUser({
+  const allUsers = await storage.getAllUsers();
+  const isFirstUser = allUsers.length === 0;
+  const userData = {
     id: claims["sub"],
     email: claims["email"],
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
-  });
+    role: isFirstUser ? "admin" : "user",
+  };
+  await storage.upsertUser(userData);
 }
 
 export async function setupAuth(app: Express) {
@@ -136,6 +140,16 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 
   const now = Math.floor(Date.now() / 1000);
   if (now <= user.expires_at) {
+    // Enrich session with DB role on every request
+    try {
+      const dbUser = await storage.getUser(user.claims?.sub);
+      if (dbUser) {
+        user.role = dbUser.role;
+        user.isAdmin = dbUser.role === "admin";
+      }
+    } catch (e) {
+      // silently ignore enrichment failure
+    }
     return next();
   }
 
@@ -154,4 +168,28 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
+};
+
+export const requireAdmin: RequestHandler = async (req, res, next) => {
+  const user = req.user as any;
+  if (!req.isAuthenticated() || !user.expires_at) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  const dbUser = await storage.getUser(user.claims?.sub);
+  if (!dbUser || dbUser.role !== "admin") {
+    return res.status(403).json({ message: "Admin access required" });
+  }
+  return next();
+};
+
+export const requireRole = (role: string): RequestHandler => async (req, res, next) => {
+  const user = req.user as any;
+  if (!req.isAuthenticated() || !user.expires_at) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  const dbUser = await storage.getUser(user.claims?.sub);
+  if (!dbUser || dbUser.role !== role) {
+    return res.status(403).json({ message: `${role} role required` });
+  }
+  return next();
 };

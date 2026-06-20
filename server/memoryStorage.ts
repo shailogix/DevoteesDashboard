@@ -1092,8 +1092,16 @@ export class MemoryStorage implements IStorage {
   }
 
   // User listing (for admin/manager views)
-  getAllUsers(): User[] {
+  async getAllUsers(): Promise<User[]> {
     return Array.from(this.users.values());
+  }
+
+  async updateUserRole(id: string, role: string): Promise<User> {
+    const user = this.users.get(id);
+    if (!user) throw new Error("User not found");
+    const updated = { ...user, role, updatedAt: new Date() };
+    this.users.set(id, updated);
+    return updated;
   }
 
   // Analytics operations
