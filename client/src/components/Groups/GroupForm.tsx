@@ -25,15 +25,13 @@ export function GroupForm({ onSubmit, onCancel, initialData, isLoading }: GroupF
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: initialData?.name || "",
+      groupName: initialData?.groupName || "",
       description: initialData?.description || "",
       groupType: initialData?.groupType || "",
       location: initialData?.location || "",
-      maxMembers: initialData?.maxMembers || undefined,
+      capacity: initialData?.capacity || undefined,
       currentMembers: initialData?.currentMembers || 0,
       meetingSchedule: initialData?.meetingSchedule || "",
-      whatsappLink: initialData?.whatsappLink || "",
-      telegramLink: initialData?.telegramLink || "",
       isActive: initialData?.isActive ?? true,
     },
   });
@@ -55,12 +53,12 @@ export function GroupForm({ onSubmit, onCancel, initialData, isLoading }: GroupF
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="name"
+                name="groupName"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Group Name *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter group name" {...field} />
+                      <Input placeholder="Enter group name" value={field.value || ""} onChange={field.onChange} onBlur={field.onBlur} ref={field.ref} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -73,7 +71,7 @@ export function GroupForm({ onSubmit, onCancel, initialData, isLoading }: GroupF
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Group Type *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || "satsang"}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select group type" />
@@ -102,7 +100,7 @@ export function GroupForm({ onSubmit, onCancel, initialData, isLoading }: GroupF
                   <FormItem>
                     <FormLabel>Location</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter meeting location" {...field} />
+                      <Input placeholder="Enter meeting location" value={field.value || ""} onChange={field.onChange} onBlur={field.onBlur} ref={field.ref} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -111,7 +109,7 @@ export function GroupForm({ onSubmit, onCancel, initialData, isLoading }: GroupF
 
               <FormField
                 control={form.control}
-                name="maxMembers"
+                name="capacity"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Maximum Members</FormLabel>
@@ -119,37 +117,11 @@ export function GroupForm({ onSubmit, onCancel, initialData, isLoading }: GroupF
                       <Input 
                         type="number" 
                         placeholder="Enter max members"
-                        {...field}
+                        value={field.value || ""}
                         onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                        onBlur={field.onBlur}
+                        ref={field.ref}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="whatsappLink"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>WhatsApp Group Link</FormLabel>
-                    <FormControl>
-                      <Input placeholder="https://chat.whatsapp.com/..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="telegramLink"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Telegram Group Link</FormLabel>
-                    <FormControl>
-                      <Input placeholder="https://t.me/..." {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -167,7 +139,10 @@ export function GroupForm({ onSubmit, onCancel, initialData, isLoading }: GroupF
                     <Textarea 
                       placeholder="Describe the purpose and activities of this group" 
                       className="min-h-[100px]"
-                      {...field}
+                      value={field.value || ""}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      ref={field.ref}
                     />
                   </FormControl>
                   <FormMessage />
@@ -185,7 +160,10 @@ export function GroupForm({ onSubmit, onCancel, initialData, isLoading }: GroupF
                     <Textarea 
                       placeholder="e.g., Every Sunday 6:00 PM - 8:00 PM" 
                       className="min-h-[80px]"
-                      {...field}
+                      value={field.value || ""}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      ref={field.ref}
                     />
                   </FormControl>
                   <FormMessage />

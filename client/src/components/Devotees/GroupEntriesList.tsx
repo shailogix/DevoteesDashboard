@@ -17,7 +17,7 @@ interface GroupEntriesListProps {
 export function GroupEntriesList({ group, onClose }: GroupEntriesListProps) {
   const [searchTerm, setSearchTerm] = useState("");
 
-  const { data: entries, isLoading } = useQuery({
+  const { data: entries = [], isLoading } = useQuery<GroupEntry[]>({
     queryKey: ["/api/group-entries", group.id],
   });
 

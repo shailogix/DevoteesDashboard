@@ -13,6 +13,7 @@ import { GroupEntriesList } from "./GroupEntriesList";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Group } from "@shared/schema";
+import type { Mandal, SabhaLocation } from "@shared/schema";
 
 export function DevoteeGroups() {
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
@@ -24,15 +25,15 @@ export function DevoteeGroups() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: groups, isLoading } = useQuery({
+  const { data: groups = [], isLoading } = useQuery<Group[]>({
     queryKey: ["/api/groups"],
   });
 
-  const { data: mandals } = useQuery({
+  const { data: mandals = [] } = useQuery<Mandal[]>({
     queryKey: ["/api/mandals"],
   });
 
-  const { data: sabhaLocations } = useQuery({
+  const { data: sabhaLocations = [] } = useQuery<SabhaLocation[]>({
     queryKey: ["/api/sabha-locations"],
   });
 

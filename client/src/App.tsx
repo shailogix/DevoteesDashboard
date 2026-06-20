@@ -32,6 +32,10 @@ import DevoteeProfilePage from "@/pages/DevoteeProfilePage";
 import DevStudio from "@/pages/DevStudio";
 import DashboardDesigner from "@/components/Dashboard/DashboardDesigner";
 import DynamicPage from "@/pages/DynamicPage";
+import Mandals from "@/pages/Mandals";
+import SabhaLocations from "@/pages/SabhaLocations";
+import Groups from "@/pages/Groups";
+import Notifications from "@/pages/Notifications";
 
 function EditModeCursor() {
   const { isEditMode } = useVisualEditor();
@@ -115,6 +119,10 @@ function AppContent() {
             <Route path="/events" component={Events} />
             <Route path="/volunteering" component={Volunteering} />
             <Route path="/analytics" component={Analytics} />
+            <Route path="/mandals" component={Mandals} />
+            <Route path="/sabha-locations" component={SabhaLocations} />
+            <Route path="/groups" component={Groups} />
+            <Route path="/notifications" component={Notifications} />
             <Route path="/dashboard-designer" component={DashboardDesigner} />
             <Route path="/dev-studio">
               <AdminRoute component={DevStudio} />

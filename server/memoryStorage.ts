@@ -925,9 +925,13 @@ export class MemoryStorage implements IStorage {
 
   // Mandal operations
   async getMandals(): Promise<Mandal[]> {
-    return Array.from(this.mandals.values()).sort((a, b) => 
+    return Array.from(this.mandals.values()).sort((a, b) =>
       b.createdAt.getTime() - a.createdAt.getTime()
     );
+  }
+
+  async getMandal(id: number): Promise<Mandal | undefined> {
+    return this.mandals.get(id);
   }
 
   async createMandal(mandalData: InsertMandal): Promise<Mandal> {
@@ -943,11 +947,27 @@ export class MemoryStorage implements IStorage {
     return mandal;
   }
 
+  async updateMandal(id: number, mandalData: Partial<InsertMandal>): Promise<Mandal> {
+    const existing = this.mandals.get(id);
+    if (!existing) throw new Error("Mandal not found");
+    const updated = { ...existing, ...mandalData, updatedAt: new Date() };
+    this.mandals.set(id, updated);
+    return updated;
+  }
+
+  async deleteMandal(id: number): Promise<boolean> {
+    return this.mandals.delete(id);
+  }
+
   // Sabha location operations
   async getSabhaLocations(): Promise<SabhaLocation[]> {
-    return Array.from(this.sabhaLocations.values()).sort((a, b) => 
+    return Array.from(this.sabhaLocations.values()).sort((a, b) =>
       b.createdAt.getTime() - a.createdAt.getTime()
     );
+  }
+
+  async getSabhaLocation(id: number): Promise<SabhaLocation | undefined> {
+    return this.sabhaLocations.get(id);
   }
 
   async createSabhaLocation(locationData: InsertSabhaLocation): Promise<SabhaLocation> {
@@ -961,6 +981,18 @@ export class MemoryStorage implements IStorage {
     };
     this.sabhaLocations.set(id, location);
     return location;
+  }
+
+  async updateSabhaLocation(id: number, locationData: Partial<InsertSabhaLocation>): Promise<SabhaLocation> {
+    const existing = this.sabhaLocations.get(id);
+    if (!existing) throw new Error("Sabha location not found");
+    const updated = { ...existing, ...locationData, updatedAt: new Date() };
+    this.sabhaLocations.set(id, updated);
+    return updated;
+  }
+
+  async deleteSabhaLocation(id: number): Promise<boolean> {
+    return this.sabhaLocations.delete(id);
   }
 
   // Dashboard operations

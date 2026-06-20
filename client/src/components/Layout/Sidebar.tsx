@@ -16,25 +16,29 @@ import {
   Home, Users, Building, GraduationCap, Calendar, Heart,
   CalendarDays, HandHeart, BarChart3, Settings, CreditCard,
   LogOut, Code2, Layers, Sparkles, ChevronDown, ChevronRight,
-  Plus, Users2, Globe, BookOpen, Landmark, Leaf, Mountain, X,
+  Plus, Users2, Globe, BookOpen, Landmark, MapPin, Bell, Leaf, Mountain, X,
   FileText
 } from "lucide-react";
 
 const ICON_MAP: Record<string, any> = {
   Home, Users, Building, GraduationCap, Calendar, Heart,
   CalendarDays, HandHeart, BarChart3, Settings, CreditCard,
-  Layers, Sparkles, Code2,
+  Layers, Sparkles, Code2, Landmark, MapPin, Bell, Users2,
 };
 
 const DEFAULT_NAVIGATION = [
   { id: "dashboard", name: "Dashboard", href: "/", icon: "Home", visible: true },
   { id: "devotees", name: "Devotees", href: "/devotees", icon: "Users", visible: true },
   { id: "families", name: "Families", href: "/families", icon: "Building", visible: true },
+  { id: "mandals", name: "Mandals", href: "/mandals", icon: "Landmark", visible: true },
+  { id: "sabha-locations", name: "Sabha Locations", href: "/sabha-locations", icon: "MapPin", visible: true },
+  { id: "groups", name: "Groups", href: "/groups", icon: "Users2", visible: true },
   { id: "mentors", name: "Mentors", href: "/mentors", icon: "GraduationCap", visible: true },
   { id: "attendance", name: "Attendance", href: "/attendance", icon: "Calendar", visible: true },
   { id: "donations", name: "Donations", href: "/donations", icon: "Heart", visible: true },
   { id: "events", name: "Events", href: "/events", icon: "CalendarDays", visible: true },
   { id: "volunteering", name: "Volunteering", href: "/volunteering", icon: "HandHeart", visible: true },
+  { id: "notifications", name: "Notifications", href: "/notifications", icon: "Bell", visible: true },
   { id: "analytics", name: "Analytics", href: "/analytics", icon: "BarChart3", visible: true },
   { id: "id-cards", name: "ID Card Generator", href: "/id-cards", icon: "CreditCard", visible: true },
   { id: "settings", name: "Settings", href: "/settings", icon: "Settings", visible: true },

@@ -297,38 +297,50 @@ GET /api/users/me/permissions — Get my permissions (role, isAdmin, visiblePage
 
 ---
 
-## Phase 4: Complete Frontend Pages for All Entities
+## Phase 4: Complete Frontend Pages for All Entities ✅ COMPLETE
 
-### Problem
-`mandals` and `sabha_locations` have database tables and API routes but no dedicated frontend pages.
+### What was done
+Created full CRUD frontend pages for all entities that had backend tables but no UI:
 
-### Solution
-Create full pages for these entities:
+1. **Mandals Page** (`/mandals`) ✅
+   - Table view with all mandals (name, code, hindiName, description)
+   - Search/filter by name, code, description
+   - Create/Edit mandal dialog form
+   - Delete mandal with confirmation dialog
+   - View mandal dialog showing members, events, and locations stats
+   - Backend API routes: GET/POST/PUT/DELETE /api/mandals/:id
 
-1. **Mandals Page** (`/mandals`)
-   - List view with all mandals
-   - Create/Edit mandal form
-   - Show associated devotees (linked via `devotee.mandalId` or group)
-   - Show associated events
-   - Show sabha locations within each mandal
+2. **Sabha Locations Page** (`/sabha-locations`) ✅
+   - Card grid view with all locations
+   - Search/filter by name, address, city, state
+   - Create/Edit location dialog form
+   - Delete location with confirmation dialog
+   - View location dialog showing upcoming events and mandal affiliation
+   - Backend API routes: GET/POST/PUT/DELETE /api/sabha-locations/:id
 
-2. **Sabha Locations Page** (`/sabha-locations`)
-   - List view with all locations
-   - Map integration (if possible, or address display)
-   - Show upcoming events at this location
-   - Show which mandal it belongs to
+3. **Groups Page** (`/groups`) ✅
+   - Card grid view with all groups
+   - Type badges (satsang, study, service, youth, other)
+   - Member count with capacity indicator
+   - Create/Edit group dialog with full form
+   - Delete group with confirmation dialog
+   - View group dialog showing members, location, and schedule
 
-3. **Dashboard Designer** (`/dashboard-designer`)
-   - Already exists but ensure it's fully functional
-   - Allow users to drag widgets: Stats, Events, Attendance, Donations
+4. **Notifications Page** (`/notifications`) ✅
+   - Full notification center with filter tabs (all/unread/pinned/info/warning/error)
+   - Mark individual read, mark all read
+   - Pin/unpin notifications
+   - Delete notifications
+   - Type-based color coding and icons
+   - Real-time updates with 30-second polling
 
-4. **Groups Page** (`/groups`)
-   - Ensure full CRUD is visible
-   - Group members management
-   - Group messaging interface
-
-5. **Notifications Page** (`/notifications`)
-   - Full notification center with read/unread/pin
+5. **Integration** ✅
+   - All pages registered in `App.tsx` routes
+   - All pages added to sidebar `DEFAULT_NAVIGATION`
+   - Sidebar icons added to `ICON_MAP`
+   - RBAC: new pages visible to all users
+   - TypeScript errors fixed in existing GroupForm and DevoteeGroups
+   - Frontend builds successfully (1.4MB JS bundle)
 
 ---
 

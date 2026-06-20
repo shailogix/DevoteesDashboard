@@ -132,10 +132,16 @@ export interface IStorage {
   deleteGroupEntry(id: number): Promise<boolean>;
 
   getMandals(): Promise<Mandal[]>;
+  getMandal(id: number): Promise<Mandal | undefined>;
   createMandal(mandal: InsertMandal): Promise<Mandal>;
+  updateMandal(id: number, mandal: Partial<InsertMandal>): Promise<Mandal>;
+  deleteMandal(id: number): Promise<boolean>;
 
   getSabhaLocations(): Promise<SabhaLocation[]>;
+  getSabhaLocation(id: number): Promise<SabhaLocation | undefined>;
   createSabhaLocation(location: InsertSabhaLocation): Promise<SabhaLocation>;
+  updateSabhaLocation(id: number, location: Partial<InsertSabhaLocation>): Promise<SabhaLocation>;
+  deleteSabhaLocation(id: number): Promise<boolean>;
 
   getDashboardLayouts(userId: string): Promise<DashboardLayout[]>;
   createDashboardLayout(layout: InsertDashboardLayout): Promise<DashboardLayout>;
@@ -537,18 +543,48 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(mandals).where(eq(mandals.isActive, true));
   }
 
+  async getMandal(id: number): Promise<Mandal | undefined> {
+    const [mandal] = await db.select().from(mandals).where(eq(mandals.id, id));
+    return mandal;
+  }
+
   async createMandal(mandal: InsertMandal): Promise<Mandal> {
     const [newMandal] = await db.insert(mandals).values(mandal).returning();
     return newMandal;
+  }
+
+  async updateMandal(id: number, mandal: Partial<InsertMandal>): Promise<Mandal> {
+    const [updated] = await db.update(mandals).set(mandal).where(eq(mandals.id, id)).returning();
+    return updated;
+  }
+
+  async deleteMandal(id: number): Promise<boolean> {
+    const result = await db.delete(mandals).where(eq(mandals.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
   async getSabhaLocations(): Promise<SabhaLocation[]> {
     return await db.select().from(sabhaLocations).where(eq(sabhaLocations.isActive, true));
   }
 
+  async getSabhaLocation(id: number): Promise<SabhaLocation | undefined> {
+    const [location] = await db.select().from(sabhaLocations).where(eq(sabhaLocations.id, id));
+    return location;
+  }
+
   async createSabhaLocation(location: InsertSabhaLocation): Promise<SabhaLocation> {
     const [newLocation] = await db.insert(sabhaLocations).values(location).returning();
     return newLocation;
+  }
+
+  async updateSabhaLocation(id: number, location: Partial<InsertSabhaLocation>): Promise<SabhaLocation> {
+    const [updated] = await db.update(sabhaLocations).set(location).where(eq(sabhaLocations.id, id)).returning();
+    return updated;
+  }
+
+  async deleteSabhaLocation(id: number): Promise<boolean> {
+    const result = await db.delete(sabhaLocations).where(eq(sabhaLocations.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
   async getDashboardLayouts(userId: string): Promise<DashboardLayout[]> {
@@ -985,10 +1021,16 @@ class FallbackStorage implements IStorage {
   async deleteGroupEntry(id: number) { return this.executeWithFallback(s => s.deleteGroupEntry(id)); }
 
   async getMandals() { return this.executeWithFallback(s => s.getMandals()); }
+  async getMandal(id: number) { return this.executeWithFallback(s => s.getMandal(id)); }
   async createMandal(mandal: InsertMandal) { return this.executeWithFallback(s => s.createMandal(mandal)); }
+  async updateMandal(id: number, mandal: Partial<InsertMandal>) { return this.executeWithFallback(s => s.updateMandal(id, mandal)); }
+  async deleteMandal(id: number) { return this.executeWithFallback(s => s.deleteMandal(id)); }
 
   async getSabhaLocations() { return this.executeWithFallback(s => s.getSabhaLocations()); }
+  async getSabhaLocation(id: number) { return this.executeWithFallback(s => s.getSabhaLocation(id)); }
   async createSabhaLocation(location: InsertSabhaLocation) { return this.executeWithFallback(s => s.createSabhaLocation(location)); }
+  async updateSabhaLocation(id: number, location: Partial<InsertSabhaLocation>) { return this.executeWithFallback(s => s.updateSabhaLocation(id, location)); }
+  async deleteSabhaLocation(id: number) { return this.executeWithFallback(s => s.deleteSabhaLocation(id)); }
 
   async getDashboardLayouts(userId: string) { return this.executeWithFallback(s => s.getDashboardLayouts(userId)); }
   async createDashboardLayout(layout: InsertDashboardLayout) { return this.executeWithFallback(s => s.createDashboardLayout(layout)); }

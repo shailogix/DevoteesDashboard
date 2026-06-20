@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { DevoteeForm } from "./DevoteeForm";
 import { DevoteeProfile } from "./DevoteeProfile";
+import type { Devotee } from "@shared/schema";
 import { 
   User, 
   Search, 
@@ -32,7 +33,6 @@ import {
   Upload
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import type { Devotee } from "@shared/schema";
 
 export function DevoteeList() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -46,7 +46,7 @@ export function DevoteeList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: devotees = [], isLoading } = useQuery({
+  const { data: devotees = [], isLoading } = useQuery<Devotee[]>({
     queryKey: ["/api/devotees"],
   });
 

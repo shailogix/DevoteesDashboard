@@ -490,6 +490,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/mandals/:id', isAuthenticated, async (req, res) => {
+    try {
+      const mandal = await storage.getMandal(Number(req.params.id));
+      if (!mandal) return res.status(404).json({ message: "Mandal not found" });
+      res.json(mandal);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch mandal" });
+    }
+  });
+
+  app.put('/api/mandals/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const validatedData = insertMandalSchema.partial().parse(req.body);
+      const mandal = await storage.updateMandal(id, validatedData);
+      res.json(mandal);
+    } catch (error) {
+      console.error("Error updating mandal:", error);
+      res.status(400).json({ message: "Invalid mandal data" });
+    }
+  });
+
+  app.delete('/api/mandals/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const success = await storage.deleteMandal(id);
+      if (success) res.status(204).send();
+      else res.status(404).json({ message: "Mandal not found" });
+    } catch (error) {
+      console.error("Error deleting mandal:", error);
+      res.status(500).json({ message: "Failed to delete mandal" });
+    }
+  });
+
   // Sabha location routes
   app.get('/api/sabha-locations', isAuthenticated, async (req, res) => {
     try {
@@ -509,6 +543,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating sabha location:", error);
       res.status(400).json({ message: "Invalid sabha location data" });
+    }
+  });
+
+  app.get('/api/sabha-locations/:id', isAuthenticated, async (req, res) => {
+    try {
+      const location = await storage.getSabhaLocation(Number(req.params.id));
+      if (!location) return res.status(404).json({ message: "Sabha location not found" });
+      res.json(location);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch sabha location" });
+    }
+  });
+
+  app.put('/api/sabha-locations/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const validatedData = insertSabhaLocationSchema.partial().parse(req.body);
+      const location = await storage.updateSabhaLocation(id, validatedData);
+      res.json(location);
+    } catch (error) {
+      console.error("Error updating sabha location:", error);
+      res.status(400).json({ message: "Invalid sabha location data" });
+    }
+  });
+
+  app.delete('/api/sabha-locations/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const success = await storage.deleteSabhaLocation(id);
+      if (success) res.status(204).send();
+      else res.status(404).json({ message: "Sabha location not found" });
+    } catch (error) {
+      console.error("Error deleting sabha location:", error);
+      res.status(500).json({ message: "Failed to delete sabha location" });
     }
   });
 
