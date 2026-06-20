@@ -160,7 +160,7 @@ This is a comprehensive devotional management system built for managing spiritua
 
 ### Storage
 - Uses in-memory storage (MemoryStorage) — no PostgreSQL required
-- Seed data: 10 devotees across 3 families, 6 events, 12 months of attendance/donation/volunteering history
+- Seed data: 10 devotees across 5 families, 6 events, 12 months of attendance/donation/volunteering history, 3 mentors, 3 groups with 10 memberships, 21 donations, 18 volunteering records, 50 attendance records
 
 ## Changelog
 
@@ -189,6 +189,16 @@ Changelog:
   - Dashboard group actions: replaced console.log/alert with toast notifications and real Bulk Message dialog
   - Privacy verified: Dashboard shows only aggregate stats, no individual devotee profiles
   - All 8 themes verified: devotional, matrix, ironman, ocean, forest, royal, sunset, midnight
+- June 20, 2026. Phase 5: Full Data Interconnectivity:
+  - Devotee Profile: Mandal badge (city-linked), group membership badges, clickable family member tiles,
+    5 tabs (Details, Attendance, Donations, Volunteering, Documents) with charts
+  - Event Detail Page: Attendance list, donations, volunteering hours with devotee names via date proximity
+  - Family Detail Page: Combined stats (attendance rate, donations, seva hours), clickable member list
+  - Dashboard: Top Donors & Top Volunteers widgets with devotee names, By City breakdown, Most Active Families
+  - Global Search (Ctrl+K): Cross-entity search across devotees, families, events, groups, mandals, donations
+  - Mandals Page: View dialog with real-time member count, donations, seva hours, attendance, events, locations
+  - Backend: 10+ interconnectivity API routes for related data aggregation
+  - Cross-entity navigation: All list cards clickable to detail pages
 ```
 
 ## User Preferences

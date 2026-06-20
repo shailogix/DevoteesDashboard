@@ -135,24 +135,28 @@ export default function Dashboard() {
                   {donations
                     .sort((a: any, b: any) => parseFloat(b.amount || "0") - parseFloat(a.amount || "0"))
                     .slice(0, 5)
-                    .map((d: any) => (
-                      <button
-                        key={d.id}
-                        onClick={() => d.devoteeId && navigate(`/devotees/${d.devoteeId}`)}
-                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 text-left transition-colors"
-                      >
-                        <Avatar className="w-8 h-8">
-                          <AvatarFallback className="text-xs bg-green-100 text-green-700">
-                            {(d.devoteeName || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{d.devoteeName || "Anonymous"}</div>
-                          <div className="text-xs text-muted-foreground">{d.donationType}</div>
-                        </div>
-                        <div className="text-sm font-bold text-green-600">₹{parseFloat(d.amount || "0").toLocaleString("en-IN")}</div>
-                      </button>
-                    ))}
+                    .map((d: any) => {
+                      const dev = devotees.find((dv: any) => dv.id === d.devoteeId);
+                      const devName = dev ? `${dev.firstName} ${dev.lastName}` : "Anonymous";
+                      return (
+                        <button
+                          key={d.id}
+                          onClick={() => d.devoteeId && navigate(`/devotees/${d.devoteeId}`)}
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 text-left transition-colors"
+                        >
+                          <Avatar className="w-8 h-8">
+                            <AvatarFallback className="text-xs bg-green-100 text-green-700">
+                              {devName.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{devName}</div>
+                            <div className="text-xs text-muted-foreground">{d.donationType}</div>
+                          </div>
+                          <div className="text-sm font-bold text-green-600">₹{parseFloat(d.amount || "0").toLocaleString("en-IN")}</div>
+                        </button>
+                      );
+                    })}
                 </div>
               )}
             </CardContent>
@@ -173,60 +177,68 @@ export default function Dashboard() {
                   {volunteering
                     .sort((a: any, b: any) => (b.hoursCompleted || b.hours || 0) - (a.hoursCompleted || a.hours || 0))
                     .slice(0, 5)
-                    .map((v: any) => (
-                      <button
-                        key={v.id}
-                        onClick={() => v.devoteeId && navigate(`/devotees/${v.devoteeId}`)}
-                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 text-left transition-colors"
-                      >
-                        <Avatar className="w-8 h-8">
-                          <AvatarFallback className="text-xs bg-purple-100 text-purple-700">
-                            {(v.devoteeName || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{v.devoteeName || "Unknown"}</div>
-                          <div className="text-xs text-muted-foreground">{v.activityType}</div>
-                        </div>
-                        <Badge variant="secondary">{v.hoursCompleted || v.hours || 0}h</Badge>
-                      </button>
-                    ))}
+                    .map((v: any) => {
+                      const dev = devotees.find((dv: any) => dv.id === v.devoteeId);
+                      const devName = dev ? `${dev.firstName} ${dev.lastName}` : "Unknown";
+                      return (
+                        <button
+                          key={v.id}
+                          onClick={() => v.devoteeId && navigate(`/devotees/${v.devoteeId}`)}
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 text-left transition-colors"
+                        >
+                          <Avatar className="w-8 h-8">
+                            <AvatarFallback className="text-xs bg-purple-100 text-purple-700">
+                              {devName.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{devName}</div>
+                            <div className="text-xs text-muted-foreground">{v.activityType}</div>
+                          </div>
+                          <Badge variant="secondary">{v.hoursCompleted || v.hours || 0}h</Badge>
+                        </button>
+                      );
+                    })}
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* By Mandal breakdown */}
+        {/* By City breakdown (mandals map to cities) */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <Landmark className="w-4 h-4" /> By Mandal
+              <Landmark className="w-4 h-4" /> By City
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {mandals.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground text-sm">No mandals configured yet</div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                {mandals.map((m: any) => {
-                  const mDevs = devotees.filter((d: any) => d.city?.toLowerCase().includes(m.name?.toLowerCase()));
-                  const mDonations = mDevs.reduce((s: number, d: any) => s + donations.filter((dn: any) => dn.devoteeId === d.id).reduce((ss: number, dn: any) => ss + parseFloat(dn.amount || "0"), 0), 0);
-                  const mAttendance = mDevs.reduce((s: number, d: any) => s + attendance.filter((a: any) => a.devoteeId === d.id).length, 0);
-                  return (
-                    <button
-                      key={m.id}
-                      onClick={() => navigate(`/mandals`)}
-                      className="text-left p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all"
-                    >
-                      <div className="text-sm font-medium">{m.name}</div>
-                      <div className="text-xs text-muted-foreground mt-1">{mDevs.length} devotees · ₹{mDonations.toLocaleString("en-IN")}</div>
-                      <div className="text-xs text-muted-foreground">{mAttendance} attendance records</div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            {(() => {
+              const cities = Array.from(new Set(devotees.map((d: any) => d.city).filter(Boolean)));
+              return cities.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground text-sm">No city data yet</div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {cities.map((city: string) => {
+                    const cDevs = devotees.filter((d: any) => d.city === city);
+                    const cDonations = cDevs.reduce((s: number, d: any) => s + donations.filter((dn: any) => dn.devoteeId === d.id).reduce((ss: number, dn: any) => ss + parseFloat(dn.amount || "0"), 0), 0);
+                    const cAttendance = cDevs.reduce((s: number, d: any) => s + attendance.filter((a: any) => a.devoteeId === d.id).length, 0);
+                    const cVolunteering = cDevs.reduce((s: number, d: any) => s + volunteering.filter((v: any) => v.devoteeId === d.id).reduce((ss: number, v: any) => ss + (v.hoursCompleted || v.hours || 0), 0), 0);
+                    return (
+                      <button
+                        key={city}
+                        onClick={() => navigate(`/mandals`)}
+                        className="text-left p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all"
+                      >
+                        <div className="text-sm font-medium">{city}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{cDevs.length} devotees · ₹{cDonations.toLocaleString("en-IN")}</div>
+                        <div className="text-xs text-muted-foreground">{cAttendance} attendances · {cVolunteering}h seva</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
 
