@@ -155,6 +155,11 @@ export class MemoryStorage implements IStorage {
       { id: 9, groupName: "IWC – Interfaith Wellness Circle", description: "Interfaith dialogue, community wellness events, and spiritual exchange with other traditions.", mentorId: null, createdAt: d(180), updatedAt: now },
       { id: 10, groupName: "Katha Pravachan Group", description: "Monthly katha and pravachan sessions featuring visiting saints and in-house speakers from the community.", mentorId: 2, createdAt: d(250), updatedAt: now },
       { id: 11, groupName: "Narayan Bhakt Sabha", description: "Dedicated followers of Lord Narayan who gather weekly for Vishnu Sahasranama chanting and Purana readings.", mentorId: null, createdAt: d(150), updatedAt: now },
+      { id: 12, groupName: "International Working Committee", description: "Global coordination committee overseeing international Madhav Parivar operations, policy, and outreach.", mentorId: null, createdAt: d(120), updatedAt: now },
+      { id: 13, groupName: "International Katha Committee", description: "Organizes and coordinates international katha events, pravachan series, and visiting saints' schedules worldwide.", mentorId: null, createdAt: d(110), updatedAt: now },
+      { id: 14, groupName: "Shri Golok Dhaam", description: "Devotees dedicated to the spiritual and physical development of Shri Golok Dhaam — the divine abode project.", mentorId: 1, createdAt: d(100), updatedAt: now },
+      { id: 15, groupName: "Braj Basi", description: "Members with roots or deep connection to Braj Dham, Vrindavan and Mathura, fostering Braj culture and devotion.", mentorId: null, createdAt: d(90), updatedAt: now },
+      { id: 16, groupName: "Nav Braj Mandal", description: "New generation Braj Mandal — youth and young adults cultivating Braj bhakti through kirtan, seva and parikrama.", mentorId: null, createdAt: d(80), updatedAt: now },
     ];
     sampleGroups.forEach(g => { this.groups.set(g.id, g); this.counters.groups = Math.max(this.counters.groups, g.id + 1); });
 
