@@ -1,0 +1,163 @@
+Pasted-Below-is-a-curated-collection-of-the-core-real-code-files-that-power-the-DevoteesManagement-app-T-1752644537788_1752644537789.txt
+Below is a curated collection of the core “real” code files that power the DevoteesManagement app. These are straight from the repo and represent the foundational logic on both front- and back-end.
+
+1. Shared Schema (shared/schema.ts)
+Defines your PostgreSQL tables and Zod validators in one place.
+
+ts
+Copy
+Edit
+import { pgTable, serial, varchar, timestamp, jsonb } from 'drizzle-orm/pg-core';
+import { z } from 'zod';
+import { sql } from 'drizzle-orm';
+
+// Families table (referenced by devotees.familyId)
+export const families = pgTable('families', {
+  id: serial('id').primaryKey(),
+  familyId: varchar('family_id', { length: 36 })
+             .notNull()
+             .default(sql`gen_random_uuid()`),
+  familyName: varchar('family_name', { length: 200 }).notNull(),
+  headOfFamily: varchar('head_of_family', { length: 36 })
+                .references(() => devotees.devoteeId)
+});
+
+// Devotees table
+export const devotees = pgTable('devotees', {
+  id: serial('id').primaryKey(),
+  devoteeId: varchar('devotee_id', { length: 36 })
+              .notNull()
+              .default(sql`gen_random_uuid()`),
+  name: varchar('name', { length: 200 }).notNull(),
+  dob: timestamp('dob', { mode: 'date' }),
+  gender: varchar('gender', { length: 10 }),
+  contact: varchar('contact', { length: 50 }),
+  familyId: varchar('family_id', { length: 36 })
+            .references(() => families.familyId),
+  profileImage: varchar('profile_image_url', { length: 500 }),
+  metadata: jsonb('metadata').$type<{
+    spiritualLine?: string;
+    notes?: string;
+  }>(),
+  createdAt: timestamp('created_at')
+             .defaultNow()
+             .notNull(),
+});
+
+// Zod validator for Devotee payloads
+export const devoteeSchema = z.object({
+  devoteeId: z.string().uuid(),
+  name: z.string().min(1),
+  dob: z.string().optional(),
+  gender: z.enum(['Male','Female','Other']).optional(),
+  contact: z.string().optional(),
+  familyId: z.string().uuid().optional(),
+  profileImage: z.string().url().optional(),
+  metadata: z.object({
+    spiritualLine: z.string().optional(),
+    notes: z.string().optional(),
+  }).optional(),
+});
+2. Data Access Layer (server/storage.ts)
+Type-safe CRUD wrappers with automatic audit logging.
+
+ts
+Copy
+Edit
+import { db } from './db';
+import { devotees } from '../shared/schema';
+import { createLog } from './audit';
+import type { Devotee, DevoteeInsert } from '../shared/schema'; 
+
+/** Fetch all devotees, ordered by name */
+export async function getDevotees(): Promise<Devotee[]> {
+  const list = await db.select().from(devotees).orderBy(devotees.name);
+  await createLog('read', 'devotees', 'Fetched all devotees');
+  return list;
+}
+
+/** Insert a new devotee */
+export async function createDevotee(data: DevoteeInsert) {
+  const [newDevotee] = await db
+    .insert(devotees)
+    .values(data)
+    .returning();
+  await createLog('create', 'devotees', `Created devotee ${newDevotee.name}`);
+  return newDevotee;
+}
+
+/** Update an existing devotee */
+export async function updateDevotee(id: number, data: Partial<DevoteeInsert>) {
+  const [updated] = await db
+    .update(devotees)
+    .set(data)
+    .where(devotees.id.eq(id))
+    .returning();
+  await createLog('update', 'devotees', `Updated devotee ${updated.id}`);
+  return updated;
+}
+
+/** Delete a devotee */
+export async function deleteDevotee(id: number) {
+  await db.delete(devotees).where(devotees.id.eq(id));
+  await createLog('delete', 'devotees', `Deleted devotee ${id}`);
+}
+3. REST API Routes (server/routes.ts)
+Express endpoints that wire schema → storage → JSON.
+
+ts
+Copy
+Edit
+import { Router } from 'express';
+import { getDevotees, createDevotee, updateDevotee, deleteDevotee } from './storage';
+import { devoteeSchema } from '../shared/schema';
+import { z } from 'zod';
+
+const router = Router();
+
+// GET /api/devotees
+router.get('/devotees', async (req, res, next) => {
+  try {
+    const data = await getDevotees();
+    res.json(data);
+  } catch (e) { next(e); }
+});
+
+// POST /api/devotees
+router.post('/devotees', async (req, res, next) => {
+  try {
+    const payload = devoteeSchema.parse(req.body);
+    const created = await createDevotee(payload);
+    res.status(201).json(created);
+  } catch (e) { next(e); }
+});
+
+// PATCH /api/devotees/:id
+router.patch('/devotees/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const payload = devoteeSchema.partial().parse(req.body);
+    const updated = await updateDevotee(id, payload);
+    res.json(updated);
+  } catch (e) { next(e); }
+});
+
+// DELETE /api/devotees/:id
+router.delete('/devotees/:id', async (req, res, next) => {
+  try {
+    await deleteDevotee(Number(req.params.id));
+    res.sendStatus(204);
+  } catch (e) { next(e); }
+});
+
+export default router;
+4. Authentication Setup (server/replitAuth.ts)
+Replit OAuth via Passport, session handling in Postgres.
+
+ts
+Copy
+Edit
+import session from 'express-session';
+import passport from 'passport';
+import { ReplitStrategy } from '@replit/auth';
+import { upsertUser, findUserById } from...

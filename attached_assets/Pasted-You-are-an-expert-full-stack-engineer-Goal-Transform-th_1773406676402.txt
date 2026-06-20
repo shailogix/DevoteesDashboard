@@ -1,0 +1,104 @@
+You are an expert full‑stack engineer.
+
+Goal: Transform the existing web app in this repo into a portable, local‑first "Devotee Management Studio" desktop application with the following properties:
+
+1) PLATFORM & PACKAGING
+- Wrap the existing React/web frontend into an Electron or Tauri desktop shell (choose the one that best fits the repo; prefer Tauri if the codebase is clean and Rust support is acceptable, otherwise use Electron).
+- The app must run as a portable desktop app: no global install required. A user should be able to double‑click the main executable or script from a folder and the app should start with all features available.
+- Ensure the UI is fully responsive so the same codebase can later be wrapped as a PWA or mobile shell.
+
+2) EMBEDDED DATABASE (NO EXTERNAL DB)
+- Integrate an embedded SQLite database to store all data locally. Use a well‑maintained Node/Rust binding appropriate to the chosen shell.
+- Define schemas for:
+  - Devotees (core identity fields + JSON column for extra fields).
+  - Events & attendance.
+  - Donations/seva.
+  - Messaging links (Telegram user ID, WhatsApp number, preferences).
+  - Audit logs.
+- Implement a database access layer (repository/ORM) that abstracts queries and updates.
+
+3) ENCRYPTION & SECURITY
+- Implement application‑level encryption:
+  - All sensitive fields (contact info, donations, chat IDs) must be encrypted before being written to SQLite.
+  - Use a strong algorithm (e.g., AES‑256‑GCM) and a key derived from an admin passphrase via a KDF (PBKDF2, scrypt, or Argon2).
+- On first launch, prompt for an admin/master secret and store only a salted hash/derived key as needed, never the raw secret.
+- Store encryption keys using OS secure storage if feasible (Keychain, DPAPI, etc.), with a fallback to encrypted local storage.
+- Protect all views and APIs behind an authentication layer (login screen). Only authenticated users can view data; only Admin and Developer roles can see sensitive settings.
+
+4) ROLES & MODES
+- Implement at least three roles: Developer, Admin, and Standard User.
+- Create two distinct modes:
+  - Admin Mode: manage devotees, events, donations, exports, dashboards.
+  - Developer Mode: advanced configuration mode.
+- Developer Mode activation:
+  - Triggered via a special shortcut or hidden entry plus a secret passphrase (default "DevelopZ" but configurable by Developer).
+  - Show a clear visual indicator when Developer Mode is active.
+
+5) DEVELOPER MODE CAPABILITIES
+In Developer Mode, expose a configuration UI that:
+- Treats all pages as JSON‑driven layouts built from a fixed component library (tables, forms, cards, charts, buttons, icons, images, tabs, sidebars).
+- Allows the Developer to:
+  - Edit text labels, icons, and images for any visible component.
+  - Add, remove, or reorder sidebar tabs and link them to pages.
+  - Configure which fields appear on the devotee profile page and how they are laid out.
+  - Define custom fields via a field‑definition system that writes to a JSON column and updates the schema metadata.
+- Store all layout and field configuration in the encrypted database as versioned configuration documents.
+
+6) DASHBOARD & PIVOT‑LIKE VIEWS
+- Implement a dashboard designer that lets Admins/Developers build dashboards composed of:
+  - Metric cards (counts, sums, etc.).
+  - Tables.
+  - Charts.
+- Provide a pivot‑like configuration UI that lets users choose dimensions and measures and produces grouped/aggregated views from the local data.
+- Ensure the dashboard and pivot logic run fully client‑side using data from the embedded database.
+
+7) MACROS & AUTOMATION
+- Implement a macro/automation engine with:
+  - Triggers: manual (button), scheduled (timer), and basic data events.
+  - Actions: DB updates, exports, dashboard refreshes, and queuing messages to Telegram/WhatsApp integration modules.
+- Provide a visual rule builder for non‑developer users and, optionally, a sandboxed script editor for advanced macros.
+- Store all macros and their versions in the encrypted configuration store.
+
+8) VERSIONING, UPDATE, AND ROLLBACK
+- Separate binary version and configuration version:
+  - Keep config snapshots in the DB; allow Developer to name and roll back to any prior snapshot.
+  - Implement a basic update mechanism that can:
+    - Check for new app versions.
+    - Download signed binaries.
+    - Verify signatures and perform in‑place updates.
+- Implement a "safe mode" that loads a minimal default layout if the active configuration is invalid, and offers a config rollback option.
+
+9) MESSAGING INTEGRATION (TELEGRAM & WHATSAPP)
+- Create integration modules for Telegram and WhatsApp with the following constraints:
+  - Core app should function fully offline.
+  - Messaging features should be clearly separated and only active when network and configuration are available.
+- For now, implement:
+  - Outbound message preparation: from inside the app, allow Admin to select devotees and generate pre‑filled Telegram/WhatsApp deep links or API payloads.
+  - A pluggable connector layer where a future small relay service can be added to support full chatbots and webhooks.
+
+10) DATA COLLECTION FORMS
+- Implement a form‑builder UI in Developer Mode to define data collection forms:
+  - Each form has fields mapped to specific devotee record fields (including custom fields).
+  - Support internal forms (rendered inside the app) and exportable definitions that can later be used by a Telegram/WhatsApp relay.
+- For internal use, allow an operator to enter a devotee’s unique ID, load their record, and fill/update responses.
+
+11) LIVE SPORTS SECTION
+- Add an optional dashboard widget type that embeds a configurable web video/streaming URL (iframe or equivalent) to show live sports or other streams.
+- Provide configuration options to enable/disable this widget and change its source URL.
+
+12) SECURITY & HARDENING
+- Obfuscate client code in production builds as much as reasonably possible.
+- Implement integrity checks to detect tampering with core files where feasible.
+- Ensure all sensitive data at rest in the SQLite DB is encrypted.
+- Enforce least privilege in the internal APIs (Developer vs Admin vs User).
+
+13) QUALITY & TESTS
+- Add unit/integration tests for:
+  - Encryption/decryption of fields.
+  - Role‑based access control.
+  - Developer Mode configuration changes and rollback.
+  - Basic macro execution.
+
+Work in small, coherent PR‑style steps.
+Explain each major architectural decision as you modify the codebase.
+Where repo structure is unclear, inspect files first and propose a clean organization before implementing.

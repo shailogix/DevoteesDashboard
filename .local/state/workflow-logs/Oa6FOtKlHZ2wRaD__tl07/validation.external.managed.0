@@ -1,0 +1,39 @@
+VERDICT: REJECTED
+The notification pin/unpin and word-wrap work is mostly implemented, but this diff should not be approved because it includes substantial unrelated changes with a serious security regression and clear AI-slop patterns.
+
+Critical finVERDICT: REJECTED
+dings:
+- **Serious out-of-scope expansion**: The task was Notifications + word wrap + Dev Studio word-wrap toggle, but the diff also introduces large unrelated features (Devotee documents, Analytics rewrite, Donations receipt modal, Dashboard behavior changes, extra seeded groups). This materially increases regression risk and makes the task reThe notification pin/unpin and word-wrap work is mostly implemented, but this diff should not be approved because it includes substantial unrelated changes with a serious security regression and clear AI-slop patterns.
+view non-isolated.
+- **Security regression introduced**: `GET /
+api/devotees/:id/documents` is guarded only by `isAuCritical findings:
+thenticated` (server/routes.ts), exposing sensitive uploaded doc- **Serious out-of-scope expansion**: The task was Notifications + word wrap + Dev Studio word-wrap toggle, but the diff also introduces large unrelated features (Devotee documents, Analytics rewrite, Donations receipt modal, Dashboard behavior changes, extra seeded groups). This materially increases regression risk and makes the task review non-isolated.
+uments to any logged-in user. Write routes require God mode, but read route does not. This is a high-severity access-control issue (PII/docs exposure).
+- **AI-generated slop indicators in changed files**: extensive new `as any`/`as any[]` casts and broad shotgun edits in `Analytics.tsx` unrelated to task objective. Per review policy, this is a reject condition when introduced in the diff.
+
+Task-objective status (for the requested task itself):
+- Notifications: `isPinned` added in memory model, pin/unpin routes added, header panel split into pinned + recent, scroll area and max height implemented.
+- Word wrap: sidebar subtitle/nav wrapping and several truncation-to-tooltip/wrap updates are present.
+- Dev Studio: word-wrap toggle added to visual control creation path and applied via visual override CSS.
+
+Security:
+- **Serious violation observed**: broken access control on document read endpoint (`GET /api/devotees/:id/documents`).
+
+Next actions:
+1. Remove or split all unrelated changes from this PR; keep only files needed for notifications/word-wrap/dev-studio toggle.
+2. If document routes remain in any branch, gate document **read** with admin/dev (God mode) authorization consistent with sensitivity.
+3. Eliminate newly introduced `any` casts in changed code and keep scope tightly aligned to the task before resubmitting.- **Security regression introduced**: `GET /api/devotees/:id/documents` is guarded only by `isAuthenticated` (server/routes.ts), exposing sensitive uploaded documents to any logged-in user. Write routes require God mode, but read route does not. This is a high-severity access-control issue (PII/docs exposure).
+- **AI-generated slop indicators in changed files**: extensive new `as any`/`as any[]` casts and broad shotgun edits in `Analytics.tsx` unrelated to task objective. Per review policy, this is a reject condition when introduced in the diff.
+
+Task-objective status (for the requested task itself):
+- Notifications: `isPinned` added in memory model, pin/unpin routes added, header panel split into pinned + recent, scroll area and max height implemented.
+- Word wrap: sidebar subtitle/nav wrapping and several truncation-to-tooltip/wrap updates are present.
+- Dev Studio: word-wrap toggle added to visual control creation path and applied via visual override CSS.
+
+Security:
+- **Serious violation observed**: broken access control on document read endpoint (`GET /api/devotees/:id/documents`).
+
+Next actions:
+1. Remove or split all unrelated changes from this PR; keep only files needed for notifications/word-wrap/dev-studio toggle.
+2. If document routes remain in any branch, gate document **read** with admin/dev (God mode) authorization consistent with sensitivity.
+3. Eliminate newly introduced `any` casts in changed code and keep scope tightly aligned to the task before resubmitting.

@@ -1,0 +1,25 @@
+#2 - Notifications Polish & UI Word Wrap
+What & Why
+The notification bell panel needs a proper scrollbar so long lists are navigable, and a pin/unpin feature so important alerts are never accidentally lost. Separately, several sidebar labels and other text throughout the app truncate unexpectedly — all text should word-wrap where truncation causes loss of information. Dev Mode should expose a word-wrap toggle when creating any text or label control.
+
+Done looks like
+Notification panel has a visible, scrollable area with a max-height; pinned notifications sit at the top in a "Pinned" section with an unpin button; unpinned/regular notifications scroll beneath; each notification has a pin icon; pinned items survive "mark all read" and can only be removed via unpin or explicit delete
+The sidebar subtitle "Devotional Community Management..." wraps to two lines instead of truncating
+Any other truncated text labels across the app (nav items, card titles, table cells, badges) wrap or show full text on hover via tooltip
+In Dev Mode, the "Create label / text control" wizard in Dev Studio includes a "Word Wrap" toggle that sets whitespace: normal vs whitespace: nowrap on the generated element
+Pin/unpin state is persisted in the in-memory notifications store via a new isPinned boolean field
+Out of scope
+Push notifications or real-time WebSocket delivery
+Notification categories or filtering
+Tasks
+Notification schema + API — Add isPinned field to the in-memory notification store and schema; add PUT /api/notifications/:id/pin and PUT /api/notifications/:id/unpin endpoints.
+Notification panel UI — Restructure the header notification dropdown to show a "Pinned" section at top and a scrollable "Recent" section below; add pin/unpin icon button on each item; enforce max-height so the panel scrolls.
+Word wrap audit + fix — Fix sidebar subtitle truncation; scan all truncate / overflow-hidden / whitespace-nowrap usages across Layout, Sidebar, and card components and replace with break-words or line-clamp with tooltip fallback as appropriate.
+Dev Mode word-wrap toggle — In the Dev Studio visual element creator panel, add a "Word Wrap" checkbox to the text/label creation form that injects the correct CSS class onto the generated element.
+Relevant files
+client/src/components/Layout/Header.tsx
+client/src/components/Layout/Sidebar.tsx
+server/memoryStorage.ts
+server/routes.ts
+client/src/pages/DevStudio.tsx
+shared/schema.ts

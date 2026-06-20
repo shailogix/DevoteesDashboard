@@ -1,0 +1,38 @@
+# Devotee Form & Data Overhaul
+
+## What & Why
+The Add/Edit Devotee form is missing many fields needed for full community management: profile image, mandal, Telegram details, introducer, eligibility/test records, progression/promotion history, darshan status, and Golok Dham membership. The Mentors tab on the Devotees page currently shows volunteering data instead of mentor profiles (bug). All fields captured anywhere in the system should be stored in the devotee record and kept in sync. This task fixes the form, the mentors bug, and expands the devotee data model to cover everything the community needs.
+
+## Done looks like
+- **Mentors page bug fixed** — The Mentors tab within the Devotees page shows actual mentor profiles (devotees with spiritualLevel = Mentor or Guide), not volunteering records
+- **Add/Edit Devotee form** is reorganized into 6 clear tabs:
+  - *Basic Info*: First Name, Last Name, Gender, Date of Birth, Profile Photo upload, Occupation, Mandal, Active toggle
+  - *Contact*: Email, Phone, WhatsApp, Telegram ID, Telegram Username, Telegram Phone (if different), Emergency Contact, Emergency Phone, Address, City, State, Pincode
+  - *Spiritual Journey*: Spiritual Level, Dietary Preferences, Previous Experience, who introduced them to the community (searchable devotee picker), Mentor (searchable devotee picker, only shows mentor-level devotees)
+  - *Community Journey*: Join Date, Family (dropdown), Darshan Done (yes/no), Date of Darshan; Eligibility Test — Test Taken By (devotee picker), Test Date, Pass/Fail, Remarks; Promotion — Current Group/Level, Promotion Date, Promoted By; Added to Golok Dham (yes/no), Added to IWC (yes/no)
+  - *Skills & Notes*: Special Skills, Medical Conditions, Notes
+  - *Documents*: Upload PAN, Aadhaar, Passport, and other documents (same document uploader as profile page)
+- **Schema additions** — New fields added to devotee in-memory store: `mandal`, `telegramId`, `telegramUsername`, `telegramPhone`, `introducedById` (FK to devotees), `eligibilityTestDate`, `eligibilityTestBy`, `eligibilityTestPassed`, `eligibilityRemarks`, `darshaDone`, `darshaDate`, `golokDhamMember`, `iwcMember`, `currentGroup`, `promotionDate`, `promotedBy`
+- **Devotees table** on the Devotees list page displays key new fields as additional columns (Mandal, Darshan Status, Group Level) that can be toggled with a column picker
+- All new fields are also reflected in the profile page Details tab without requiring a separate task
+
+## Out of scope
+- Automatic sync to the community groups (adding to Golok Dham group when field is set) — that is future work
+- Field-level change history / audit log
+- Bulk import of these new fields
+
+## Tasks
+1. **Schema expansion** — Add all new devotee fields to the in-memory devotee data model and the insertDevoteeSchema; update the 20 seeded devotees to include sample values for the key new fields (mandal, telegramId, darshaDone, etc.)
+2. **Fix Mentors page bug** — The Mentors tab in the Devotees page currently queries volunteering data; fix it to query devotees where spiritualLevel is Mentor/Guide/Teacher and display them as mentor cards with their mentee count and profile link
+3. **Devotee form redesign** — Rebuild DevoteeForm with 6 tabs as described; add the profile image uploader (base64), all new fields, the searchable devotee picker for "Introduced By" and "Mentor", and the inline document uploader on the Documents tab; ensure all fields are validated and submitted correctly
+4. **Devotees list column picker** — Add a "Columns" button above the devotees table that opens a popover letting the user show/hide columns including the new fields (Mandal, Darshan Status, Group Level, Telegram)
+5. **Profile page Details tab sync** — Update the Details tab on DevoteeProfilePage to display all new fields under appropriate sub-headings (Community Journey section, Telegram Contact section, etc.)
+
+## Relevant files
+- `client/src/components/Devotees/DevoteeForm.tsx`
+- `client/src/pages/Devotees.tsx`
+- `client/src/components/Devotees/DevoteeList.tsx`
+- `client/src/pages/DevoteeProfilePage.tsx`
+- `server/memoryStorage.ts`
+- `server/routes.ts`
+- `shared/schema.ts`

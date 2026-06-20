@@ -1,0 +1,160 @@
+Pasted-Here-s-a-blueprint-for-baking-a-full-featured-Macro-Creator-right-into-your-DevoteesManagement-syste-1752644431596_1752644431597.txt
+Here’s a blueprint for baking a full-featured Macro Creator right into your DevoteesManagement system—covering data model, UI/UX, back-end engine, and sample workflows.
+
+1. Data Model
+Add a new macros table (via Drizzle migrations) to store every macro definition:
+
+sql
+Copy
+Edit
+CREATE TABLE macros (
+  id             SERIAL PRIMARY KEY,
+  name           TEXT NOT NULL,
+  description    TEXT,
+  is_active      BOOLEAN NOT NULL DEFAULT TRUE,
+  trigger_type   TEXT NOT NULL,      -- e.g. "entity_event", "scheduled", "threshold"
+  trigger_config JSONB NOT NULL,     -- { entity: "donation", event: "create" } or { cron: "0 8 * * *" }
+  condition_config JSONB,            -- optional filter logic, e.g. [{ field:"amount", op:">", value:10000 }]
+  actions_config  JSONB NOT NULL,    -- e.g. [{ type:"sendEmail", params:{ to:"treasurer@…", template:"largeDonation" } }]
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_macros_trigger ON macros(trigger_type);
+2. Trigger Types & Config
+Entity Events (trigger_type = "entity_event")
+
+Fires on CRUD operations for your domain tables (devotees, donations, attendance, etc.)
+
+trigger_config example:
+
+json
+Copy
+Edit
+{ "entity": "donations", "event": "create" }
+Scheduled (trigger_type = "scheduled")
+
+Cron-style timing (daily, weekly, custom). Use [node-cron] or [agenda].
+
+trigger_config example:
+
+json
+Copy
+Edit
+{ "cron": "0 8 * * *" }  // every day at 08:00
+Threshold / Data-Driven (trigger_type = "threshold")
+
+Fire when a numeric field crosses a value.
+
+trigger_config example:
+
+json
+Copy
+Edit
+{ "entity":"donations", "field":"amount", "operator":">", "value":5000 }
+3. Conditions Builder
+Store zero or more condition clauses in condition_config to narrow down when a trigger actually fires. For example:
+
+json
+Copy
+Edit
+[
+  { "field": "fundType", "op": "equals", "value": "Seva" },
+  { "field": "amount", "op": ">=", "value": 10000 }
+]
+In your macro engine you’ll:
+
+Fetch macros matching the trigger type.
+
+For each macro, merge the actual event payload into a JS object, then apply each clause (AND by default).
+
+If all pass, execute the actions_config.
+
+4. Action Types
+Define a small catalog of action handlers—each one receiving a params object. Examples:
+
+Type	Params	What it does
+sendEmail	{ to, subjectTemplate, bodyTemplate, mergeData }	Fires off an email via your SMTP or SendGrid API
+sendSMS	{ to, messageTemplate, mergeData }	Integrate Twilio or an SMS gateway
+createRecord	{ entity, data }	Inserts a new row in the given table
+updateRecord	{ entity, idField, idValue, data }	Patches an existing record
+webhook	{ url, method, headers, bodyTemplate, mergeData }	Calls an external endpoint
+inAppNotification	{ userId, messageTemplate, mergeData }	Saves a notification for that user in your DB
+
+Each template can use simple Handlebars-style placeholders ({{name}}, {{amount}}) filled from the event payload.
+
+5. Macro Engine Implementation
+A. Event Bus
+
+In your Express app, wrap all storage calls to emit events:
+
+ts
+Copy
+Edit
+import EventEmitter from 'events';
+export const macroBus = new EventEmitter();
+
+// In createDonation service:
+async function createDonation(data) {
+  const record = await db.insert(donations).values(data).returning();
+  macroBus.emit('entity_event', { entity:'donations', event:'create', payload: record });
+  return record;
+}
+B. Scheduled Jobs
+
+On server startup, load all "scheduled" macros and schedule them via [node-cron]:
+
+ts
+Copy
+Edit
+import cron from 'node-cron';
+macros.filter(m => m.trigger_type==='scheduled').forEach(m => {
+  cron.schedule(m.trigger_config.cron, () => runMacro(m));
+});
+C. Macro Runner
+
+A centralized runMacro(macro, eventPayload?) function that:
+
+Applies condition_config against eventPayload.
+
+For each actions_config entry, calls its registered handler.
+
+Logs success/failure in an macro_runs table for auditing.
+
+6. UI / UX for Macro Builder
+A. Macro List Page
+Table of macros with columns: Name, Trigger Type, Active, Last Run, Actions (Edit/Toggle/Delete).
+
+B. Macro Wizard (4 steps)
+Details: Name & Description
+
+Trigger:
+
+Dropdown: Entity Event / Scheduled / Threshold
+
+If Entity: pick table & event (Create/Edit/Delete)
+
+If Scheduled: cron-picker widget
+
+If Threshold: pick table, field, operator, value
+
+Conditions (optional): add/remove clause rows
+
+Actions:
+
+“Add Action” button opens sub-form: pick action type, fill params via dynamic fields
+
+Preview of the merged template with sample data
+
+Use React Hook Form + dynamic field arrays for a smooth experience, with live JSON preview on the side.
+
+7. Security & Permissions
+Only Admins may create or modify macros.
+
+Store the AES key (for QR codes) and any API secrets in environment variables—never in client code.
+
+Sanitize all webhook URLs and templates to prevent injection.
+
+8. Testing & Observability
+Unit Tests for each trigger handler and action executor.
+
+Integration Tests: simulate an event (e.g. donation > ₹10k) and assert that your emai...
