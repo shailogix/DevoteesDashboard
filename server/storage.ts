@@ -15,6 +15,11 @@ import {
   sabhaLocations,
   dashboardLayouts,
   userPreferences,
+  devConfig,
+  devMacros,
+  auditLog,
+  visualOverrides,
+  rollbackSlots,
   type User,
   type UpsertUser,
   type Devotee,
@@ -43,6 +48,16 @@ import {
   type InsertDashboardLayout,
   type UserPreferences,
   type InsertUserPreferences,
+  type DevConfigEntry,
+  type InsertDevConfig,
+  type DevMacro,
+  type InsertDevMacro,
+  type AuditLogEntry,
+  type InsertAuditLog,
+  type VisualOverride,
+  type InsertVisualOverride,
+  type RollbackSlot,
+  type InsertRollbackSlot,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, count, sum, sql } from "drizzle-orm";
@@ -118,6 +133,35 @@ export interface IStorage {
 
   getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
   upsertUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferences>;
+
+  // Dev Config
+  getDevConfig(key: string): Promise<DevConfigEntry | undefined>;
+  getAllDevConfig(): Promise<DevConfigEntry[]>;
+  setDevConfig(key: string, value: any): Promise<DevConfigEntry>;
+  deleteDevConfig(key: string): Promise<boolean>;
+
+  // Dev Macros
+  getDevMacros(): Promise<DevMacro[]>;
+  getDevMacro(id: number): Promise<DevMacro | undefined>;
+  createDevMacro(macro: InsertDevMacro): Promise<DevMacro>;
+  updateDevMacro(id: number, macro: Partial<InsertDevMacro>): Promise<DevMacro>;
+  deleteDevMacro(id: number): Promise<boolean>;
+  incrementMacroRunCount(id: number): Promise<DevMacro>;
+
+  // Audit Log
+  getAuditLog(limit?: number, entity?: string, action?: string): Promise<AuditLogEntry[]>;
+  addAuditLogEntry(entry: InsertAuditLog): Promise<AuditLogEntry>;
+
+  // Visual Overrides
+  getVisualOverrides(): Promise<VisualOverride[]>;
+  setVisualOverride(override: InsertVisualOverride): Promise<VisualOverride>;
+  clearVisualOverrides(): Promise<boolean>;
+
+  // Rollback Slots
+  getRollbackSlots(): Promise<RollbackSlot[]>;
+  getRollbackSlot(index: number): Promise<RollbackSlot | undefined>;
+  createRollbackSlot(slot: InsertRollbackSlot): Promise<RollbackSlot>;
+  deleteRollbackSlot(index: number): Promise<boolean>;
 
   getStats(): Promise<{
     totalDevotees: number;
@@ -575,6 +619,145 @@ export class DatabaseStorage implements IStorage {
       hours: parseInt(r.hours as string) || 0,
     }));
   }
+
+  // ─── Dev Config ─────────────────────────────────────────────────────────────
+  async getDevConfig(key: string): Promise<DevConfigEntry | undefined> {
+    const [entry] = await db.select().from(devConfig).where(eq(devConfig.key, key));
+    return entry;
+  }
+
+  async getAllDevConfig(): Promise<DevConfigEntry[]> {
+    return await db.select().from(devConfig);
+  }
+
+  async setDevConfig(key: string, value: any): Promise<DevConfigEntry> {
+    const [entry] = await db
+      .insert(devConfig)
+      .values({ key, value })
+      .onConflictDoUpdate({
+        target: devConfig.key,
+        set: { value, updatedAt: new Date() },
+      })
+      .returning();
+    return entry;
+  }
+
+  async deleteDevConfig(key: string): Promise<boolean> {
+    const result = await db.delete(devConfig).where(eq(devConfig.key, key));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // ─── Dev Macros ─────────────────────────────────────────────────────────────
+  async getDevMacros(): Promise<DevMacro[]> {
+    return await db.select().from(devMacros).orderBy(desc(devMacros.createdAt));
+  }
+
+  async getDevMacro(id: number): Promise<DevMacro | undefined> {
+    const [macro] = await db.select().from(devMacros).where(eq(devMacros.id, id));
+    return macro;
+  }
+
+  async createDevMacro(macro: InsertDevMacro): Promise<DevMacro> {
+    const [newMacro] = await db.insert(devMacros).values(macro).returning();
+    return newMacro;
+  }
+
+  async updateDevMacro(id: number, macro: Partial<InsertDevMacro>): Promise<DevMacro> {
+    const [updatedMacro] = await db
+      .update(devMacros)
+      .set({ ...macro, updatedAt: new Date() })
+      .where(eq(devMacros.id, id))
+      .returning();
+    return updatedMacro;
+  }
+
+  async deleteDevMacro(id: number): Promise<boolean> {
+    const result = await db.delete(devMacros).where(eq(devMacros.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async incrementMacroRunCount(id: number): Promise<DevMacro> {
+    const [updated] = await db
+      .update(devMacros)
+      .set({ runCount: sql`${devMacros.runCount} + 1`, lastRunAt: new Date() })
+      .where(eq(devMacros.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ─── Audit Log ──────────────────────────────────────────────────────────────
+  async getAuditLog(limit = 100, entity?: string, action?: string): Promise<AuditLogEntry[]> {
+    let query = db.select().from(auditLog).orderBy(desc(auditLog.timestamp));
+    if (entity) {
+      query = query.where(eq(auditLog.entity, entity)) as any;
+    }
+    if (action) {
+      query = query.where(eq(auditLog.action, action)) as any;
+    }
+    const entries = await query;
+    return entries.slice(0, limit);
+  }
+
+  async addAuditLogEntry(entry: InsertAuditLog): Promise<AuditLogEntry> {
+    const [newEntry] = await db.insert(auditLog).values(entry).returning();
+    return newEntry;
+  }
+
+  // ─── Visual Overrides ─────────────────────────────────────────────────────
+  async getVisualOverrides(): Promise<VisualOverride[]> {
+    return await db.select().from(visualOverrides);
+  }
+
+  async setVisualOverride(override: InsertVisualOverride): Promise<VisualOverride> {
+    const [existing] = await db
+      .select()
+      .from(visualOverrides)
+      .where(eq(visualOverrides.selector, override.selector));
+    if (existing) {
+      const [updated] = await db
+        .update(visualOverrides)
+        .set({ property: override.property, value: override.value })
+        .where(eq(visualOverrides.selector, override.selector))
+        .returning();
+      return updated;
+    }
+    const [newOverride] = await db.insert(visualOverrides).values(override).returning();
+    return newOverride;
+  }
+
+  async clearVisualOverrides(): Promise<boolean> {
+    const result = await db.delete(visualOverrides);
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // ─── Rollback Slots ─────────────────────────────────────────────────────────
+  async getRollbackSlots(): Promise<RollbackSlot[]> {
+    return await db.select().from(rollbackSlots).orderBy(rollbackSlots.slotIndex);
+  }
+
+  async getRollbackSlot(index: number): Promise<RollbackSlot | undefined> {
+    const [slot] = await db.select().from(rollbackSlots).where(eq(rollbackSlots.slotIndex, index));
+    return slot;
+  }
+
+  async createRollbackSlot(slot: InsertRollbackSlot): Promise<RollbackSlot> {
+    const [existing] = await db.select().from(rollbackSlots).where(eq(rollbackSlots.slotIndex, slot.slotIndex));
+    if (existing) {
+      const [updated] = await db
+        .update(rollbackSlots)
+        .set({ overrides: slot.overrides, name: slot.name, savedAt: new Date() })
+        .where(eq(rollbackSlots.slotIndex, slot.slotIndex))
+        .returning();
+      return updated;
+    }
+    const [newSlot] = await db.insert(rollbackSlots).values(slot).returning();
+    return newSlot;
+  }
+
+  async deleteRollbackSlot(index: number): Promise<boolean> {
+    const result = await db.delete(rollbackSlots).where(eq(rollbackSlots.slotIndex, index));
+    return (result.rowCount ?? 0) > 0;
+  }
 }
 
 import { MemoryStorage } from "./memoryStorage";
@@ -681,6 +864,35 @@ class FallbackStorage implements IStorage {
   async getDonationTrends() { return this.executeWithFallback(s => s.getDonationTrends()); }
   async getAttendanceTrends() { return this.executeWithFallback(s => s.getAttendanceTrends()); }
   async getVolunteeringStats() { return this.executeWithFallback(s => s.getVolunteeringStats()); }
+
+  // Dev Config
+  async getDevConfig(key: string) { return this.executeWithFallback(s => s.getDevConfig(key)); }
+  async getAllDevConfig() { return this.executeWithFallback(s => s.getAllDevConfig()); }
+  async setDevConfig(key: string, value: any) { return this.executeWithFallback(s => s.setDevConfig(key, value)); }
+  async deleteDevConfig(key: string) { return this.executeWithFallback(s => s.deleteDevConfig(key)); }
+
+  // Dev Macros
+  async getDevMacros() { return this.executeWithFallback(s => s.getDevMacros()); }
+  async getDevMacro(id: number) { return this.executeWithFallback(s => s.getDevMacro(id)); }
+  async createDevMacro(macro: InsertDevMacro) { return this.executeWithFallback(s => s.createDevMacro(macro)); }
+  async updateDevMacro(id: number, macro: Partial<InsertDevMacro>) { return this.executeWithFallback(s => s.updateDevMacro(id, macro)); }
+  async deleteDevMacro(id: number) { return this.executeWithFallback(s => s.deleteDevMacro(id)); }
+  async incrementMacroRunCount(id: number) { return this.executeWithFallback(s => s.incrementMacroRunCount(id)); }
+
+  // Audit Log
+  async getAuditLog(limit?: number, entity?: string, action?: string) { return this.executeWithFallback(s => s.getAuditLog(limit, entity, action)); }
+  async addAuditLogEntry(entry: InsertAuditLog) { return this.executeWithFallback(s => s.addAuditLogEntry(entry)); }
+
+  // Visual Overrides
+  async getVisualOverrides() { return this.executeWithFallback(s => s.getVisualOverrides()); }
+  async setVisualOverride(override: InsertVisualOverride) { return this.executeWithFallback(s => s.setVisualOverride(override)); }
+  async clearVisualOverrides() { return this.executeWithFallback(s => s.clearVisualOverrides()); }
+
+  // Rollback Slots
+  async getRollbackSlots() { return this.executeWithFallback(s => s.getRollbackSlots()); }
+  async getRollbackSlot(index: number) { return this.executeWithFallback(s => s.getRollbackSlot(index)); }
+  async createRollbackSlot(slot: InsertRollbackSlot) { return this.executeWithFallback(s => s.createRollbackSlot(slot)); }
+  async deleteRollbackSlot(index: number) { return this.executeWithFallback(s => s.deleteRollbackSlot(index)); }
 }
 
 export const storage = new FallbackStorage();

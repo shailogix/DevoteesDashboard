@@ -73,6 +73,23 @@ export class MemoryStorage implements IStorage {
   public notifications: Map<number, Notification> = new Map();
   public documentStore: Map<number, DevoteeDocument[]> = new Map();
 
+  // Dev Config (in-memory fallback)
+  public devConfigStore: Map<string, any> = new Map();
+
+  // Dev Macros (in-memory fallback)
+  public devMacros: Map<number, any> = new Map();
+  private macroCounter = 1;
+
+  // Audit Log (in-memory fallback)
+  public auditLogEntries: any[] = [];
+
+  // Visual Overrides (in-memory fallback)
+  public visualOverridesStore: Record<string, any> = {};
+
+  // Rollback Slots (in-memory fallback)
+  public rollbackSlots: any[] = [];
+  public rollbackNextIndex = 0;
+
   // Counter for auto-incrementing IDs
   private counters = {
     devotees: 1,
@@ -1160,5 +1177,97 @@ export class MemoryStorage implements IStorage {
       byActivity[act] = (byActivity[act] || 0) + ((v as any).hoursCompleted || (v as any).hours || 0);
     });
     return Object.entries(byActivity).map(([activity, hours]) => ({ activity, hours })).sort((a, b) => b.hours - a.hours).slice(0, 8);
+  }
+
+  // ─── Dev Config (in-memory fallback) ────────────────────────────────────────
+  async getDevConfig(key: string): Promise<any> {
+    return this.devConfigStore.get(key);
+  }
+  async getAllDevConfig(): Promise<any[]> {
+    return Array.from(this.devConfigStore.entries()).map(([key, value]) => ({ key, value, createdAt: new Date(), updatedAt: new Date() }));
+  }
+  async setDevConfig(key: string, value: any): Promise<any> {
+    this.devConfigStore.set(key, value);
+    return { key, value, createdAt: new Date(), updatedAt: new Date() };
+  }
+  async deleteDevConfig(key: string): Promise<boolean> {
+    return this.devConfigStore.delete(key);
+  }
+
+  // ─── Dev Macros (in-memory fallback) ───────────────────────────────────────
+  async getDevMacros(): Promise<any[]> {
+    return Array.from(this.devMacros.values()).sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  }
+  async getDevMacro(id: number): Promise<any | undefined> {
+    return this.devMacros.get(id);
+  }
+  async createDevMacro(macro: any): Promise<any> {
+    const id = this.macroCounter++;
+    const entry = { id, ...macro, runCount: 0, lastRunAt: null, createdAt: new Date(), updatedAt: new Date() };
+    this.devMacros.set(id, entry);
+    return entry;
+  }
+  async updateDevMacro(id: number, macro: any): Promise<any> {
+    const existing = this.devMacros.get(id);
+    if (!existing) throw new Error("Macro not found");
+    const updated = { ...existing, ...macro, updatedAt: new Date() };
+    this.devMacros.set(id, updated);
+    return updated;
+  }
+  async deleteDevMacro(id: number): Promise<boolean> {
+    return this.devMacros.delete(id);
+  }
+  async incrementMacroRunCount(id: number): Promise<any> {
+    const macro = this.devMacros.get(id);
+    if (!macro) throw new Error("Macro not found");
+    macro.runCount = (macro.runCount || 0) + 1;
+    macro.lastRunAt = new Date();
+    this.devMacros.set(id, macro);
+    return macro;
+  }
+
+  // ─── Audit Log (in-memory fallback) ───────────────────────────────────────
+  async getAuditLog(limit?: number, entity?: string, action?: string): Promise<any[]> {
+    let logs = [...this.auditLogEntries];
+    if (entity) logs = logs.filter((l: any) => l.entity === entity);
+    if (action) logs = logs.filter((l: any) => l.action === action);
+    return logs.slice(0, limit || 100);
+  }
+  async addAuditLogEntry(entry: any): Promise<any> {
+    const newEntry = { id: this.auditLogEntries.length + 1, timestamp: new Date().toISOString(), ...entry };
+    this.auditLogEntries.unshift(newEntry);
+    if (this.auditLogEntries.length > 500) this.auditLogEntries.pop();
+    return newEntry;
+  }
+
+  // ─── Visual Overrides (in-memory fallback) ───────────────────────────────
+  async getVisualOverrides(): Promise<any[]> {
+    return Object.entries(this.visualOverridesStore).map(([key, value]) => ({ id: key, selector: key, value, createdAt: new Date(), updatedAt: new Date() }));
+  }
+  async setVisualOverride(override: any): Promise<any> {
+    this.visualOverridesStore[override.selector] = override.value;
+    return { id: override.selector, ...override, createdAt: new Date(), updatedAt: new Date() };
+  }
+  async clearVisualOverrides(): Promise<boolean> {
+    this.visualOverridesStore = {};
+    return true;
+  }
+
+  // ─── Rollback Slots (in-memory fallback) ─────────────────────────────────
+  async getRollbackSlots(): Promise<any[]> {
+    return this.rollbackSlots;
+  }
+  async getRollbackSlot(index: number): Promise<any | undefined> {
+    return this.rollbackSlots.find((s: any) => s.slotIndex === index);
+  }
+  async createRollbackSlot(slot: any): Promise<any> {
+    const entry = { ...slot, createdAt: new Date(), updatedAt: new Date() };
+    this.rollbackSlots.push(entry);
+    return entry;
+  }
+  async deleteRollbackSlot(index: number): Promise<boolean> {
+    const before = this.rollbackSlots.length;
+    this.rollbackSlots = this.rollbackSlots.filter((s: any) => s.slotIndex !== index);
+    return this.rollbackSlots.length < before;
   }
 }

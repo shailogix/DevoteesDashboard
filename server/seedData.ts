@@ -3,7 +3,14 @@ import { storage } from "./storage";
 
 export async function seedDemoData() {
   try {
-    // Seed Mandals from the image
+    // Skip if data already seeded (check any existing groups)
+    const existingGroups = await storage.getGroups();
+    if (existingGroups.length > 0) {
+      console.log("Demo data already present, skipping seed.");
+      return;
+    }
+
+    // Seed Mandals — skip if already exist
     const mandals = [
       { name: "Shri Ayodhya Mandal", hindiName: "श्री अयोध्या मंडल", code: "AY" },
       { name: "Shri Dwarkadhish Mandal", hindiName: "श्री द्वारकाधीश मंडल", code: "DW" },
@@ -22,12 +29,19 @@ export async function seedDemoData() {
       { name: "None", hindiName: "कोई नहीं", code: "NN" },
     ];
 
+    const existingMandals = await storage.getMandals();
+    const existingCodes = new Set(existingMandals.map((m) => m.code));
     for (const mandal of mandals) {
-      await storage.createMandal({
-        ...mandal,
-        description: `Traditional mandal group for ${mandal.name}`,
-        isActive: true,
-      });
+      if (existingCodes.has(mandal.code)) continue;
+      try {
+        await storage.createMandal({
+          ...mandal,
+          description: `Traditional mandal group for ${mandal.name}`,
+          isActive: true,
+        });
+      } catch (e: any) {
+        console.log("Skipping mandal seed (already exists):", mandal.code);
+      }
     }
 
     // Seed Sabha Locations

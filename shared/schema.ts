@@ -264,6 +264,56 @@ export const dashboardLayouts = pgTable("dashboard_layouts", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Dev Configuration storage table (persistent dev config)
+export const devConfig = pgTable("dev_config", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 100 }).unique().notNull(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Dev Macros storage table
+export const devMacros = pgTable("dev_macros", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  steps: jsonb("steps").notNull(),
+  runCount: integer("run_count").default(0),
+  lastRunAt: timestamp("last_run_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Audit Log storage table
+export const auditLog = pgTable("audit_log", {
+  id: serial("id").primaryKey(),
+  action: varchar("action", { length: 50 }).notNull(),
+  entity: varchar("entity", { length: 50 }).notNull(),
+  entityId: varchar("entity_id", { length: 100 }),
+  userId: varchar("user_id", { length: 100 }).notNull(),
+  beforeData: jsonb("before_data"),
+  afterData: jsonb("after_data"),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+// Visual Overrides storage table
+export const visualOverrides = pgTable("visual_overrides", {
+  id: serial("id").primaryKey(),
+  selector: varchar("selector", { length: 500 }).notNull(),
+  property: varchar("property", { length: 100 }).notNull(),
+  value: text("value").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Rollback Slots storage table
+export const rollbackSlots = pgTable("rollback_slots", {
+  id: serial("id").primaryKey(),
+  slotIndex: integer("slot_index").notNull(),
+  name: varchar("name", { length: 255 }),
+  overrides: jsonb("overrides").notNull(),
+  savedAt: timestamp("saved_at").defaultNow(),
+});
+
 // User Preferences storage table
 export const userPreferences = pgTable("user_preferences", {
   id: serial("id").primaryKey(),
@@ -397,6 +447,12 @@ export const userPreferencesRelations = relations(userPreferences, ({ one }) => 
   }),
 }));
 
+export const devConfigRelations = relations(devConfig, ({}) => ({}));
+export const devMacrosRelations = relations(devMacros, ({}) => ({}));
+export const auditLogRelations = relations(auditLog, ({}) => ({}));
+export const visualOverridesRelations = relations(visualOverrides, ({}) => ({}));
+export const rollbackSlotsRelations = relations(rollbackSlots, ({}) => ({}));
+
 // Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users).pick({
   id: true,
@@ -480,6 +536,34 @@ export const insertUserPreferencesSchema = createInsertSchema(userPreferences).o
   updatedAt: true,
 });
 
+export const insertDevConfigSchema = createInsertSchema(devConfig).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export const insertDevMacroSchema = createInsertSchema(devMacros).omit({
+  id: true,
+  runCount: true,
+  lastRunAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLog).omit({
+  id: true,
+  timestamp: true,
+});
+
+export const insertVisualOverrideSchema = createInsertSchema(visualOverrides).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertRollbackSlotSchema = createInsertSchema(rollbackSlots).omit({
+  id: true,
+  savedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -522,6 +606,21 @@ export type DashboardLayout = typeof dashboardLayouts.$inferSelect;
 
 export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;
 export type UserPreferences = typeof userPreferences.$inferSelect;
+
+export type InsertDevConfig = z.infer<typeof insertDevConfigSchema>;
+export type DevConfigEntry = typeof devConfig.$inferSelect;
+
+export type InsertDevMacro = z.infer<typeof insertDevMacroSchema>;
+export type DevMacro = typeof devMacros.$inferSelect;
+
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLogEntry = typeof auditLog.$inferSelect;
+
+export type InsertVisualOverride = z.infer<typeof insertVisualOverrideSchema>;
+export type VisualOverride = typeof visualOverrides.$inferSelect;
+
+export type InsertRollbackSlot = z.infer<typeof insertRollbackSlotSchema>;
+export type RollbackSlot = typeof rollbackSlots.$inferSelect;
 
 // ─── Notification (in-memory only, not persisted in DB) ──────────────────────
 export const notificationSchema = z.object({

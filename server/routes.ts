@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { MemoryStorage } from "./memoryStorage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { devConfig } from "./devConfig";
 
 import { randomBytes } from "crypto";
 
@@ -19,6 +20,21 @@ const requireGodMode = (req: any, res: any, next: any) => {
     });
   }
   next();
+};
+
+const addAudit = async (action: string, entity: string, entityId: any, userId: string, before: any, after: any) => {
+  try {
+    await storage.addAuditLogEntry({
+      action,
+      entity,
+      entityId: entityId != null ? String(entityId) : null,
+      userId,
+      beforeData: before ? JSON.parse(JSON.stringify(before)) : null,
+      afterData: after ? JSON.parse(JSON.stringify(after)) : null,
+    });
+  } catch (e) {
+    console.error("Failed to add audit log entry:", e);
+  }
 };
 import {
   insertDevoteeSchema,
@@ -793,103 +809,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dev mode config (store/retrieve application config)
-  const devConfig: Record<string, any> = {
-    appInfo: {
-      name: "Madhav Parivar",
-      subtitle: "Devotional Community Management",
-      logoSymbol: "॥",
-      logoGradientFrom: "primary",
-      logoGradientTo: "secondary",
-    },
-    navigation: {
-      items: [
-        { id: "dashboard", name: "Dashboard", href: "/", icon: "Home", visible: true, order: 0 },
-        { id: "devotees", name: "Devotees", href: "/devotees", icon: "Users", visible: true, order: 1 },
-        { id: "families", name: "Families", href: "/families", icon: "Building", visible: true, order: 2 },
-        { id: "mentors", name: "Mentors", href: "/mentors", icon: "GraduationCap", visible: true, order: 3 },
-        { id: "attendance", name: "Attendance", href: "/attendance", icon: "Calendar", visible: true, order: 4 },
-        { id: "donations", name: "Donations", href: "/donations", icon: "Heart", visible: true, order: 5 },
-        { id: "events", name: "Events", href: "/events", icon: "CalendarDays", visible: true, order: 6 },
-        { id: "volunteering", name: "Volunteering", href: "/volunteering", icon: "HandHeart", visible: true, order: 7 },
-        { id: "analytics", name: "Analytics", href: "/analytics", icon: "BarChart3", visible: true, order: 8 },
-        { id: "id-cards", name: "ID Card Generator", href: "/id-cards", icon: "CreditCard", visible: true, order: 9 },
-        { id: "settings", name: "Settings", href: "/settings", icon: "Settings", visible: true, order: 10 },
-      ],
-    },
-    theme: {
-      activePreset: "devotional",
-      customColors: {
-        primary: "24 100% 60%",
-        secondary: "343 100% 25%",
-        accent: "51 100% 50%",
-        background: "60 29% 94%",
-        foreground: "210 20% 18%",
-        card: "0 0% 100%",
-        border: "20 5.9% 90%",
-        muted: "54 23% 89%",
-      },
-      borderRadius: "0.5",
-      useCustom: false,
-    },
-    customFields: [
-      { id: "spiritual_name", label: "Spiritual Name", type: "text", entity: "devotee", required: false, placeholder: "Enter spiritual name" },
-      { id: "initiation_date", label: "Initiation Date", type: "date", entity: "devotee", required: false, placeholder: "" },
-      { id: "preferred_seva", label: "Preferred Seva", type: "dropdown", entity: "devotee", required: false, options: ["Puja", "Kitchen", "Outreach", "Education", "Music", "IT Support"], placeholder: "Select seva" },
-    ],
-    roleProfiles: {
-      admin: {
-        label: "Administrator",
-        visiblePages: ["dashboard","devotees","families","mentors","attendance","donations","events","volunteering","analytics","id-cards","settings","dev-studio"],
-        canEdit: true,
-        canDelete: true,
-      },
-      manager: {
-        label: "Manager",
-        visiblePages: ["dashboard","devotees","families","mentors","attendance","donations","events","volunteering","analytics","id-cards"],
-        canEdit: true,
-        canDelete: false,
-      },
-      volunteer: {
-        label: "Volunteer",
-        visiblePages: ["dashboard","devotees","attendance","events"],
-        canEdit: false,
-        canDelete: false,
-      },
-    },
-    snapshots: [] as Array<{ id: string; name: string; createdAt: string; config: any }>,
-    featureFlags: {
-      donations: true,
-      analytics: true,
-      volunteering: true,
-      idCards: true,
-      groups: true,
-      mentors: true,
-      events: true,
-      attendance: true,
-    } as Record<string, boolean>,
-    receiptTemplate: {
-      orgName: "Madhav Parivar",
-      orgSubtitle: "Devotional Community Management",
-      orgAddress: "Community Hall, Athwa, Surat, Gujarat - 395001",
-      orgPhone: "+91 98765 43210",
-      orgEmail: "info@madhavparivar.org",
-      orgWebsite: "www.madhavparivar.org",
-      orgRegNo: "Trust Reg. No. MP/2020/001",
-      section80G: "80G Certificate No. MP/80G/2020",
-      authorizedSignatory: "Community Administrator",
-      receiptFooter: "Jai Shri Krishna • This receipt is computer generated and is valid without signature.",
-      showLogo: true,
-      logoText: "॥ MP ॥",
-      primaryColor: "#b45309",
-      receiptTitle: "Donation Receipt",
-    },
-    analyticsDashboards: [] as Array<{ id: string; title: string; icon: string; panels: any[] }>,
-    cardThemes: [] as Array<{ id: string; name: string; colors: any; logo?: string; bgImage?: string }>,
-    visualOverrides: {} as Record<string, any>,
-    rollbackSlots: [] as Array<{ index: number; name: string; savedAt: string; overrides: Record<string, any> }>,
-    rollbackNextIndex: 0,
-  };
+  // Initialize dev config from database
+  await devConfig.init();
 
   // ─── GOD MODE SESSION ACTIVATION ────────────────────────────────────────────
   app.post('/api/admin/activate', isAuthenticated, async (req, res) => {
@@ -909,37 +830,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get('/api/dev-config', isAuthenticated, async (req, res) => {
-    res.json(devConfig);
+    res.json(devConfig.getAll());
   });
 
   app.put('/api/dev-config', isAuthenticated, async (req, res) => {
-    Object.assign(devConfig, req.body);
-    res.json(devConfig);
+    await devConfig.import(req.body);
+    res.json(devConfig.getAll());
   });
 
   app.patch('/api/dev-config/app-info', isAuthenticated, async (req, res) => {
-    devConfig.appInfo = { ...devConfig.appInfo, ...req.body };
-    res.json(devConfig.appInfo);
+    await devConfig.patch('appInfo', req.body);
+    res.json(devConfig.get('appInfo'));
   });
 
   app.patch('/api/dev-config/navigation', isAuthenticated, async (req, res) => {
-    devConfig.navigation = { ...devConfig.navigation, ...req.body };
-    res.json(devConfig.navigation);
+    await devConfig.patch('navigation', req.body);
+    res.json(devConfig.get('navigation'));
   });
 
   app.patch('/api/dev-config/theme', isAuthenticated, async (req, res) => {
-    devConfig.theme = { ...devConfig.theme, ...req.body };
-    res.json(devConfig.theme);
+    await devConfig.patch('theme', req.body);
+    res.json(devConfig.get('theme'));
   });
 
   app.patch('/api/dev-config/custom-fields', isAuthenticated, async (req, res) => {
-    devConfig.customFields = req.body.fields;
-    res.json(devConfig.customFields);
+    await devConfig.set('customFields', req.body.fields);
+    res.json(devConfig.get('customFields'));
   });
 
   app.patch('/api/dev-config/role-profiles', isAuthenticated, async (req, res) => {
-    devConfig.roleProfiles = { ...devConfig.roleProfiles, ...req.body };
-    res.json(devConfig.roleProfiles);
+    await devConfig.patch('roleProfiles', req.body);
+    res.json(devConfig.get('roleProfiles'));
   });
 
   app.post('/api/dev-config/snapshot', isAuthenticated, async (req, res) => {
@@ -948,17 +869,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       id: `snap_${Date.now()}`,
       name: name || `Snapshot ${new Date().toLocaleString()}`,
       createdAt: new Date().toISOString(),
-      config: JSON.parse(JSON.stringify({ appInfo: devConfig.appInfo, navigation: devConfig.navigation, theme: devConfig.theme, customFields: devConfig.customFields, roleProfiles: devConfig.roleProfiles })),
+      config: JSON.parse(JSON.stringify({
+        appInfo: devConfig.get('appInfo'),
+        navigation: devConfig.get('navigation'),
+        theme: devConfig.get('theme'),
+        customFields: devConfig.get('customFields'),
+        roleProfiles: devConfig.get('roleProfiles'),
+      })),
     };
-    devConfig.snapshots.unshift(snapshot);
-    if (devConfig.snapshots.length > 10) devConfig.snapshots.pop();
+    const snapshots = devConfig.get('snapshots') || [];
+    snapshots.unshift(snapshot);
+    if (snapshots.length > 10) snapshots.pop();
+    await devConfig.set('snapshots', snapshots);
     res.json(snapshot);
   });
 
   app.post('/api/dev-config/restore/:snapshotId', isAuthenticated, async (req, res) => {
-    const snap = devConfig.snapshots.find((s: any) => s.id === req.params.snapshotId);
+    const snapshots = devConfig.get('snapshots') || [];
+    const snap = snapshots.find((s: any) => s.id === req.params.snapshotId);
     if (!snap) return res.status(404).json({ message: "Snapshot not found" });
-    Object.assign(devConfig, snap.config);
+    await devConfig.import(snap.config);
     res.json({ message: "Restored", config: snap.config });
   });
 
@@ -966,11 +896,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const exportData = {
       version: "1.0",
       exportedAt: new Date().toISOString(),
-      appInfo: devConfig.appInfo,
-      navigation: devConfig.navigation,
-      theme: devConfig.theme,
-      customFields: devConfig.customFields,
-      roleProfiles: devConfig.roleProfiles,
+      appInfo: devConfig.get('appInfo'),
+      navigation: devConfig.get('navigation'),
+      theme: devConfig.get('theme'),
+      customFields: devConfig.get('customFields'),
+      roleProfiles: devConfig.get('roleProfiles'),
     };
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', 'attachment; filename="madhav-parivar-config.json"');
@@ -980,88 +910,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/dev-config/import', isAuthenticated, async (req, res) => {
     try {
       const { appInfo, navigation, theme, customFields, roleProfiles } = req.body;
-      if (appInfo) devConfig.appInfo = appInfo;
-      if (navigation) devConfig.navigation = navigation;
-      if (theme) devConfig.theme = theme;
-      if (customFields) devConfig.customFields = customFields;
-      if (roleProfiles) devConfig.roleProfiles = roleProfiles;
-      res.json({ message: "Config imported successfully", config: devConfig });
+      const updates: Record<string, any> = {};
+      if (appInfo) updates.appInfo = appInfo;
+      if (navigation) updates.navigation = navigation;
+      if (theme) updates.theme = theme;
+      if (customFields) updates.customFields = customFields;
+      if (roleProfiles) updates.roleProfiles = roleProfiles;
+      await devConfig.import(updates);
+      res.json({ message: "Config imported successfully", config: devConfig.getAll() });
     } catch (e) {
       res.status(400).json({ message: "Invalid config format" });
     }
   });
 
   // ─── GOD MODE: AUDIT LOG ───────────────────────────────────────────────────
-  const auditLog: any[] = [];
-  const addAudit = (action: string, entity: string, entityId: any, userId: string, before: any, after: any) => {
-    auditLog.unshift({ id: auditLog.length + 1, timestamp: new Date().toISOString(), action, entity, entityId, userId, before, after });
-    if (auditLog.length > 500) auditLog.pop();
-  };
-  (app as any)._addAudit = addAudit;
-
   app.get('/api/admin/audit', isAuthenticated, async (req: any, res) => {
-    const { entity, action, limit = "100" } = req.query;
-    let logs = [...auditLog];
-    if (entity) logs = logs.filter(l => l.entity === entity);
-    if (action) logs = logs.filter(l => l.action === action);
-    res.json(logs.slice(0, Number(limit)));
+    try {
+      const { entity, action, limit = "100" } = req.query;
+      const logs = await storage.getAuditLog(Number(limit), entity, action);
+      res.json(logs);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
   });
 
   // ─── GOD MODE: MACROS ──────────────────────────────────────────────────────
-  const macros: any[] = [];
-  let macroIdCounter = 1;
-
-  app.get('/api/admin/macros', isAuthenticated, async (_req, res) => res.json(macros));
+  app.get('/api/admin/macros', isAuthenticated, async (_req, res) => {
+    try {
+      const macros = await storage.getDevMacros();
+      res.json(macros);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
 
   app.post('/api/admin/macros', isAuthenticated, async (req: any, res) => {
-    const macro = { id: macroIdCounter++, ...req.body, createdAt: new Date().toISOString(), runCount: 0, lastRunAt: null };
-    macros.unshift(macro);
-    res.status(201).json(macro);
+    try {
+      const macro = await storage.createDevMacro({
+        name: req.body.name,
+        description: req.body.description,
+        steps: req.body.steps,
+      });
+      res.status(201).json(macro);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
   });
 
   app.put('/api/admin/macros/:id', isAuthenticated, async (req: any, res) => {
-    const idx = macros.findIndex(m => m.id === Number(req.params.id));
-    if (idx === -1) return res.status(404).json({ message: "Macro not found" });
-    macros[idx] = { ...macros[idx], ...req.body, updatedAt: new Date().toISOString() };
-    res.json(macros[idx]);
+    try {
+      const macro = await storage.updateDevMacro(Number(req.params.id), {
+        name: req.body.name,
+        description: req.body.description,
+        steps: req.body.steps,
+      });
+      res.json(macro);
+    } catch (err: any) {
+      res.status(404).json({ message: err.message });
+    }
   });
 
   app.delete('/api/admin/macros/:id', isAuthenticated, async (req, res) => {
-    const idx = macros.findIndex(m => m.id === Number(req.params.id));
-    if (idx === -1) return res.status(404).json({ message: "Macro not found" });
-    macros.splice(idx, 1);
-    res.json({ message: "Macro deleted" });
+    try {
+      await storage.deleteDevMacro(Number(req.params.id));
+      res.json({ message: "Macro deleted" });
+    } catch (err: any) {
+      res.status(404).json({ message: err.message });
+    }
   });
 
   app.post('/api/admin/macros/:id/run', isAuthenticated, async (req: any, res) => {
-    const macro = macros.find(m => m.id === Number(req.params.id));
-    if (!macro) return res.status(404).json({ message: "Macro not found" });
-    const results: any[] = [];
-    for (const step of (macro.steps || [])) {
-      try {
-        if (step.type === "create_devotee" && step.data) {
-          const d = await storage.createDevotee(step.data);
-          addAudit("CREATE", "devotee", d.id, req.user?.claims?.sub || "macro", null, d);
-          results.push({ step: step.label, status: "ok", result: d });
-        } else if (step.type === "create_event" && step.data) {
-          const e = await storage.createEvent(step.data);
-          addAudit("CREATE", "event", e.id, req.user?.claims?.sub || "macro", null, e);
-          results.push({ step: step.label, status: "ok", result: e });
-        } else if (step.type === "create_attendance" && step.data) {
-          const a = await storage.createAttendance(step.data);
-          addAudit("CREATE", "attendance", a.id, req.user?.claims?.sub || "macro", null, a);
-          results.push({ step: step.label, status: "ok", result: a });
-        } else {
-          results.push({ step: step.label || "unknown", status: "skipped", note: "Step type not supported" });
+    try {
+      const macro = await storage.getDevMacro(Number(req.params.id));
+      if (!macro) return res.status(404).json({ message: "Macro not found" });
+      const results: any[] = [];
+      for (const step of (macro.steps || [])) {
+        try {
+          if (step.type === "create_devotee" && step.data) {
+            const d = await storage.createDevotee(step.data);
+            await addAudit("CREATE", "devotee", d.id, req.user?.claims?.sub || "macro", null, d);
+            results.push({ step: step.label, status: "ok", result: d });
+          } else if (step.type === "create_event" && step.data) {
+            const e = await storage.createEvent(step.data);
+            await addAudit("CREATE", "event", e.id, req.user?.claims?.sub || "macro", null, e);
+            results.push({ step: step.label, status: "ok", result: e });
+          } else if (step.type === "create_attendance" && step.data) {
+            const a = await storage.createAttendance(step.data);
+            await addAudit("CREATE", "attendance", a.id, req.user?.claims?.sub || "macro", null, a);
+            results.push({ step: step.label, status: "ok", result: a });
+          } else {
+            results.push({ step: step.label || "unknown", status: "skipped", note: "Step type not supported" });
+          }
+        } catch (err: any) {
+          results.push({ step: step.label || "unknown", status: "error", error: err.message });
         }
-      } catch (err: any) {
-        results.push({ step: step.label || "unknown", status: "error", error: err.message });
       }
+      await storage.incrementMacroRunCount(macro.id);
+      await addAudit("RUN_MACRO", "macro", macro.id, req.user?.claims?.sub || "system", null, { name: macro.name, steps: macro.steps?.length });
+      const updatedMacro = await storage.getDevMacro(macro.id);
+      res.json({ macro: macro.name, results, ranAt: updatedMacro?.lastRunAt });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
     }
-    macro.runCount = (macro.runCount || 0) + 1;
-    macro.lastRunAt = new Date().toISOString();
-    addAudit("RUN_MACRO", "macro", macro.id, req.user?.claims?.sub || "system", null, { name: macro.name, steps: macro.steps?.length });
-    res.json({ macro: macro.name, results, ranAt: macro.lastRunAt });
   });
 
   // ─── GOD MODE: BULK OPERATIONS ─────────────────────────────────────────────
@@ -1075,25 +1025,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (operation === "delete") {
             const before = await storage.getDevotee(id);
             await storage.deleteDevotee(id);
-            addAudit("DELETE", "devotee", id, userId, before, null);
+            await addAudit("DELETE", "devotee", id, userId, before, null);
             results.push({ id, status: "deleted" });
           } else if (operation === "update" && data) {
             const before = await storage.getDevotee(id);
             const after = await storage.updateDevotee(id, data);
-            addAudit("UPDATE", "devotee", id, userId, before, after);
+            await addAudit("UPDATE", "devotee", id, userId, before, after);
             results.push({ id, status: "updated" });
           }
         } else if (entity === "events") {
           if (operation === "delete") {
             const before = await storage.getEvent(id);
             await storage.deleteEvent(id);
-            addAudit("DELETE", "event", id, userId, before, null);
+            await addAudit("DELETE", "event", id, userId, before, null);
             results.push({ id, status: "deleted" });
           }
         } else if (entity === "attendance") {
           if (operation === "delete") {
             await storage.deleteAttendance(id);
-            addAudit("DELETE", "attendance", id, userId, null, null);
+            await addAudit("DELETE", "attendance", id, userId, null, null);
             results.push({ id, status: "deleted" });
           }
         }
@@ -1155,7 +1105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try { await storage.createEvent(e); results.events = (results.events || 0) + 1; } catch {}
         }
       }
-      addAudit("IMPORT_DATA", "system", null, userId, null, results);
+      await addAudit("IMPORT_DATA", "system", null, userId, null, results);
       res.json({ message: "Data imported successfully", imported: results });
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -1207,7 +1157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (familyId !== undefined) updates.familyId = familyId;
       if (mentorId !== undefined) updates.mentorId = mentorId;
       const after = await storage.updateDevotee(devoteeId, updates);
-      addAudit("LINK", "devotee", devoteeId, userId, before, after);
+      await addAudit("LINK", "devotee", devoteeId, userId, before, after);
       res.json(after);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -1305,111 +1255,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ─── ADMIN: FEATURE FLAGS ───────────────────────────────────────────────────
   app.get('/api/admin/feature-flags', isAuthenticated, async (_req, res) => {
-    res.json(devConfig.featureFlags);
+    res.json(devConfig.get('featureFlags'));
   });
   app.patch('/api/admin/feature-flags', isAuthenticated, requireGodMode, async (req, res) => {
     const allowed = ['donations','analytics','volunteering','idCards','groups','mentors','events','attendance'];
+    const current = devConfig.get('featureFlags') || {};
     for (const key of allowed) {
       if (key in req.body && typeof req.body[key] === 'boolean') {
-        (devConfig.featureFlags as any)[key] = req.body[key];
+        current[key] = req.body[key];
       }
     }
-    res.json(devConfig.featureFlags);
+    await devConfig.set('featureFlags', current);
+    res.json(current);
   });
 
   // ─── ADMIN: RECEIPT TEMPLATE ────────────────────────────────────────────────
   app.get('/api/admin/receipt-template', isAuthenticated, async (_req, res) => {
-    res.json(devConfig.receiptTemplate);
+    res.json(devConfig.get('receiptTemplate'));
   });
   app.patch('/api/admin/receipt-template', isAuthenticated, requireGodMode, async (req, res) => {
-    devConfig.receiptTemplate = { ...devConfig.receiptTemplate, ...req.body };
-    res.json(devConfig.receiptTemplate);
+    const current = devConfig.get('receiptTemplate') || {};
+    const updated = { ...current, ...req.body };
+    await devConfig.set('receiptTemplate', updated);
+    res.json(updated);
   });
 
   // ─── ADMIN: ANALYTICS DASHBOARDS ────────────────────────────────────────────
   app.get('/api/admin/analytics-dashboards', isAuthenticated, async (_req, res) => {
-    res.json(devConfig.analyticsDashboards);
+    res.json(devConfig.get('analyticsDashboards'));
   });
   app.post('/api/admin/analytics-dashboards', isAuthenticated, requireGodMode, async (req, res) => {
     const dashboard = { ...req.body, id: `dash_${Date.now()}` };
-    devConfig.analyticsDashboards.push(dashboard);
+    const dashboards = devConfig.get('analyticsDashboards') || [];
+    dashboards.push(dashboard);
+    await devConfig.set('analyticsDashboards', dashboards);
     res.json(dashboard);
   });
   app.put('/api/admin/analytics-dashboards/:id', isAuthenticated, requireGodMode, async (req, res) => {
-    const idx = devConfig.analyticsDashboards.findIndex((d: any) => d.id === req.params.id);
+    const dashboards = devConfig.get('analyticsDashboards') || [];
+    const idx = dashboards.findIndex((d: any) => d.id === req.params.id);
     if (idx === -1) return res.status(404).json({ message: 'Dashboard not found' });
-    devConfig.analyticsDashboards[idx] = { ...devConfig.analyticsDashboards[idx], ...req.body };
-    res.json(devConfig.analyticsDashboards[idx]);
+    dashboards[idx] = { ...dashboards[idx], ...req.body };
+    await devConfig.set('analyticsDashboards', dashboards);
+    res.json(dashboards[idx]);
   });
   app.delete('/api/admin/analytics-dashboards/:id', isAuthenticated, requireGodMode, async (req, res) => {
-    devConfig.analyticsDashboards = devConfig.analyticsDashboards.filter((d: any) => d.id !== req.params.id);
+    const dashboards = (devConfig.get('analyticsDashboards') || []).filter((d: any) => d.id !== req.params.id);
+    await devConfig.set('analyticsDashboards', dashboards);
     res.json({ deleted: true });
   });
 
   // ─── ADMIN: CARD THEMES ──────────────────────────────────────────────────────
   app.get('/api/admin/card-themes', isAuthenticated, async (_req, res) => {
-    res.json(devConfig.cardThemes);
+    res.json(devConfig.get('cardThemes'));
   });
   app.post('/api/admin/card-themes', isAuthenticated, requireGodMode, async (req, res) => {
     const theme = { ...req.body, id: `theme_${Date.now()}` };
-    devConfig.cardThemes.push(theme);
+    const themes = devConfig.get('cardThemes') || [];
+    themes.push(theme);
+    await devConfig.set('cardThemes', themes);
     res.json(theme);
   });
   app.put('/api/admin/card-themes/:id', isAuthenticated, requireGodMode, async (req, res) => {
-    const idx = devConfig.cardThemes.findIndex((t: any) => t.id === req.params.id);
+    const themes = devConfig.get('cardThemes') || [];
+    const idx = themes.findIndex((t: any) => t.id === req.params.id);
     if (idx === -1) return res.status(404).json({ message: 'Theme not found' });
-    devConfig.cardThemes[idx] = { ...devConfig.cardThemes[idx], ...req.body };
-    res.json(devConfig.cardThemes[idx]);
+    themes[idx] = { ...themes[idx], ...req.body };
+    await devConfig.set('cardThemes', themes);
+    res.json(themes[idx]);
   });
   app.delete('/api/admin/card-themes/:id', isAuthenticated, requireGodMode, async (req, res) => {
-    devConfig.cardThemes = devConfig.cardThemes.filter((t: any) => t.id !== req.params.id);
+    const themes = (devConfig.get('cardThemes') || []).filter((t: any) => t.id !== req.params.id);
+    await devConfig.set('cardThemes', themes);
     res.json({ deleted: true });
   });
 
   // ─── ADMIN: VISUAL OVERRIDES ────────────────────────────────────────────────
   app.get('/api/admin/visual-overrides', isAuthenticated, async (_req, res) => {
-    res.json(devConfig.visualOverrides);
+    res.json(devConfig.get('visualOverrides') || {});
   });
   app.patch('/api/admin/visual-overrides', isAuthenticated, requireGodMode, async (req, res) => {
-    Object.assign(devConfig.visualOverrides, req.body);
-    res.json(devConfig.visualOverrides);
+    const current = devConfig.get('visualOverrides') || {};
+    const updated = { ...current, ...req.body };
+    await devConfig.set('visualOverrides', updated);
+    res.json(updated);
   });
   app.delete('/api/admin/visual-overrides', isAuthenticated, requireGodMode, async (_req, res) => {
-    devConfig.visualOverrides = {};
+    await devConfig.set('visualOverrides', {});
     res.json({ cleared: true });
   });
 
   // ─── ADMIN: ROLLBACK SLOTS (5-slot circular buffer) ──────────────────────
   app.get('/api/admin/rollback-slots', isAuthenticated, async (_req, res) => {
+    const slots = devConfig.get('rollbackSlots') || [];
+    const nextIndex = devConfig.get('rollbackNextIndex') || 0;
     res.json({
-      slots: devConfig.rollbackSlots,
-      nextIndex: devConfig.rollbackNextIndex,
-      currentOverrides: devConfig.visualOverrides,
+      slots,
+      nextIndex,
+      currentOverrides: devConfig.get('visualOverrides') || {},
     });
   });
   app.post('/api/admin/rollback-slots', isAuthenticated, requireGodMode, async (req, res) => {
     const { name } = req.body;
-    const slotIndex = devConfig.rollbackNextIndex % 5;
+    const nextIndex = devConfig.get('rollbackNextIndex') || 0;
+    const slotIndex = nextIndex % 5;
+    const currentOverrides = devConfig.get('visualOverrides') || {};
     const slot = {
       index: slotIndex,
       name: name || `Save ${new Date().toLocaleString()}`,
       savedAt: new Date().toISOString(),
-      overrides: JSON.parse(JSON.stringify(devConfig.visualOverrides)),
+      overrides: JSON.parse(JSON.stringify(currentOverrides)),
     };
-    if (devConfig.rollbackSlots.length > slotIndex) {
-      devConfig.rollbackSlots[slotIndex] = slot;
+    const slots = devConfig.get('rollbackSlots') || [];
+    if (slots.length > slotIndex) {
+      slots[slotIndex] = slot;
     } else {
-      devConfig.rollbackSlots.push(slot);
+      slots.push(slot);
     }
-    devConfig.rollbackNextIndex = (devConfig.rollbackNextIndex + 1);
+    await devConfig.set('rollbackSlots', slots);
+    await devConfig.set('rollbackNextIndex', nextIndex + 1);
     res.json(slot);
   });
   app.post('/api/admin/rollback-slots/:index/restore', isAuthenticated, requireGodMode, async (req, res) => {
     const idx = parseInt(req.params.index);
-    const slot = devConfig.rollbackSlots.find((s: any) => s.index === idx);
+    const slots = devConfig.get('rollbackSlots') || [];
+    const slot = slots.find((s: any) => s.index === idx);
     if (!slot) return res.status(404).json({ message: "Slot not found" });
-    devConfig.visualOverrides = JSON.parse(JSON.stringify(slot.overrides));
-    res.json({ restored: true, slot, overrides: devConfig.visualOverrides });
+    await devConfig.set('visualOverrides', JSON.parse(JSON.stringify(slot.overrides)));
+    res.json({ restored: true, slot, overrides: slot.overrides });
   });
 
   // ─── ADMIN: SEED MANAGER ────────────────────────────────────────────────────
@@ -1432,7 +1405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ms = (storage as any).memStore;
       if (ms && ms.resetAndReseed) {
         ms.resetAndReseed();
-        addAudit("SEED_RESET", "system", null, req.user?.claims?.sub || "god-mode", null, { action: "Full reset and reseed" });
+        await addAudit("SEED_RESET", "system", null, req.user?.claims?.sub || "god-mode", null, { action: "Full reset and reseed" });
         res.json({ message: "Data reset and reseeded successfully" });
       } else {
         res.status(400).json({ message: "Reset not available (non-memory storage)" });
@@ -1459,7 +1432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             isActive: true,
             spiritualLevel: ["Novice", "Practitioner", "Advanced"][Math.floor(Math.random() * 3)],
           } as any);
-          addAudit("CREATE", "devotee", d.id, userId, null, d);
+          await addAudit("CREATE", "devotee", d.id, userId, null, d);
           created.push(d);
         } else if (entity === "events") {
           const titles = ["Satsang", "Puja", "Bhajan Night", "Seva Day", "Retreat"];
