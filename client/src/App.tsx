@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -11,6 +12,7 @@ import { Sidebar } from "@/components/Layout/Sidebar";
 import { useDevMode } from "@/contexts/DevModeContext";
 import { DevModeProvider } from "@/contexts/DevModeContext";
 import { VisualEditorProvider, useVisualEditor } from "@/contexts/VisualEditorContext";
+import { GodModeEditorPanel } from "@/components/GodModeEditor/GodModeEditorPanel";
 
 // Pages
 import Dashboard from "@/pages/Dashboard";
@@ -30,62 +32,17 @@ import DevoteeProfilePage from "@/pages/DevoteeProfilePage";
 import DevStudio from "@/pages/DevStudio";
 import DashboardDesigner from "@/components/Dashboard/DashboardDesigner";
 
-function VisualEditModeOverlay() {
-  const { isEditMode, toggleEditMode, unsavedChanges, isSaving, saveToSlot, selectedElementId, setSelectedElementId } = useVisualEditor();
-  const { isDevMode } = useDevMode();
-
-  if (!isDevMode) return null;
-
-  return (
-    <>
-      {isEditMode && (
-        <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 items-end">
-          <div className="bg-blue-600 text-white rounded-xl shadow-xl px-4 py-3 flex flex-col gap-2 min-w-[200px]">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-bold">✏️ Visual Edit Mode</span>
-              <button
-                onClick={toggleEditMode}
-                className="text-xs bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded transition-colors"
-              >
-                Exit
-              </button>
-            </div>
-            {selectedElementId && (
-              <div className="text-xs text-blue-100 truncate" title={`Selected: ${selectedElementId}`}>
-                Selected: <code className="bg-white/20 px-1 rounded">{selectedElementId}</code>
-              </div>
-            )}
-            <div className="flex gap-2">
-              <button
-                onClick={() => saveToSlot()}
-                disabled={isSaving || unsavedChanges === 0}
-                className="flex-1 text-xs bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed px-2 py-1.5 rounded font-medium transition-colors"
-              >
-                {isSaving ? 'Saving...' : unsavedChanges > 0 ? `Save (${unsavedChanges} changes)` : 'Saved'}
-              </button>
-              {selectedElementId && (
-                <button
-                  onClick={() => setSelectedElementId(null)}
-                  className="text-xs bg-white/20 hover:bg-white/30 px-2 py-1.5 rounded transition-colors"
-                >
-                  Deselect
-                </button>
-              )}
-            </div>
-            <div className="text-[10px] text-blue-200">Click any element to edit • 5-slot rollback</div>
-          </div>
-        </div>
-      )}
-      {!isEditMode && isDevMode && (
-        <button
-          onClick={toggleEditMode}
-          className="fixed bottom-4 right-4 z-[100] bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg flex items-center gap-1.5 transition-colors"
-        >
-          ✏️ Visual Editor
-        </button>
-      )}
-    </>
-  );
+function EditModeCursor() {
+  const { isEditMode } = useVisualEditor();
+  useEffect(() => {
+    if (isEditMode) {
+      document.body.style.cursor = 'crosshair';
+    } else {
+      document.body.style.cursor = '';
+    }
+    return () => { document.body.style.cursor = ''; };
+  }, [isEditMode]);
+  return null;
 }
 
 function AppContent() {
@@ -136,7 +93,8 @@ function AppContent() {
           </Switch>
         </div>
       </div>
-      <VisualEditModeOverlay />
+      <EditModeCursor />
+      <GodModeEditorPanel />
     </div>
   );
 }
