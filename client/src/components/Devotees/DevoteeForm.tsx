@@ -87,11 +87,11 @@ export function DevoteeForm({ devotee, onSuccess, onCancel }: DevoteeFormProps) 
   }, [devotee]);
 
   // Fetch families and mentors for dropdowns
-  const { data: families = [] } = useQuery({
+  const { data: families = [] } = useQuery<any[]>({
     queryKey: ["/api/families"],
   });
 
-  const { data: mentors = [] } = useQuery({
+  const { data: mentors = [] } = useQuery<any[]>({
     queryKey: ["/api/mentors"],
   });
 
@@ -308,7 +308,7 @@ export function DevoteeForm({ devotee, onSuccess, onCancel }: DevoteeFormProps) 
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={formData.dateOfBirth}
+                      selected={formData.dateOfBirth || undefined}
                       onSelect={(date) => {
                         handleInputChange("dateOfBirth", date);
                         setDateOfBirthOpen(false);
@@ -341,7 +341,7 @@ export function DevoteeForm({ devotee, onSuccess, onCancel }: DevoteeFormProps) 
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={formData.joinDate}
+                      selected={formData.joinDate || undefined}
                       onSelect={(date) => {
                         handleInputChange("joinDate", date);
                         setJoinDateOpen(false);

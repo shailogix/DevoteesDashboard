@@ -263,7 +263,7 @@ export async function seedDemoData() {
         await storage.createGroupMembership({
           groupId: sabhaGroup.id,
           devoteeId: dev.id,
-          joinedDate: new Date(),
+          joinDate: new Date(),
           status: "active",
           notes: "Auto-seeded",
         });

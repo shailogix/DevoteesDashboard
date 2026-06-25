@@ -51,6 +51,7 @@ interface PanelState {
   boxShadow: string;
   width: string;
   height: string;
+  display: string;
   customCss: string;
   hidden: boolean;
 }
@@ -171,7 +172,7 @@ export function GodModeEditorPanel() {
     text: '', imgSrc: '', bgColor: '', textColor: '', borderColor: '',
     fontSize: '', fontWeight: '', borderRadius: '', padding: '', margin: '',
     opacity: '', letterSpacing: '', lineHeight: '', textAlign: '', textDecoration: '',
-    textTransform: '', boxShadow: '', width: '', height: '', customCss: '', hidden: false,
+    textTransform: '', boxShadow: '', width: '', height: '', display: '', customCss: '', hidden: false,
   });
 
   // Sync state when a new element is clicked
@@ -197,6 +198,7 @@ export function GodModeEditorPanel() {
       boxShadow: existing.boxShadow ?? '',
       width: existing.width ?? '',
       height: existing.height ?? '',
+      display: existing.display ?? '',
       customCss: existing.customCss ?? '',
       hidden: existing.hidden ?? false,
     });
@@ -274,7 +276,7 @@ export function GodModeEditorPanel() {
   const reset = () => {
     if (!veId) return;
     clearOverride(veId);
-    setState({ text: info?.existingText ?? '', imgSrc: info?.existingImgSrc ?? '', bgColor: '', textColor: '', borderColor: '', fontSize: '', fontWeight: '', borderRadius: '', padding: '', margin: '', opacity: '', letterSpacing: '', lineHeight: '', textAlign: '', textDecoration: '', textTransform: '', boxShadow: '', width: '', height: '', customCss: '', hidden: false });
+    setState({ text: info?.existingText ?? '', imgSrc: info?.existingImgSrc ?? '', bgColor: '', textColor: '', borderColor: '', fontSize: '', fontWeight: '', borderRadius: '', padding: '', margin: '', opacity: '', letterSpacing: '', lineHeight: '', textAlign: '', textDecoration: '', textTransform: '', boxShadow: '', width: '', height: '', display: '', customCss: '', hidden: false });
   };
 
   if (!isDevMode) return null;

@@ -21,7 +21,7 @@ interface ApiEndpoint {
 const API_ENDPOINTS: ApiEndpoint[] = [
   // Auth
   { method: "GET", path: "/api/auth/user", description: "Get current authenticated user", auth: "Required", group: "Auth" },
-  { method: "GET", path: "/api/login", description: "Initiate Replit Auth login flow", auth: "None", group: "Auth" },
+  { method: "GET", path: "/api/login", description: "Initiate Google Auth login flow", auth: "None", group: "Auth" },
   { method: "GET", path: "/api/callback", description: "OAuth callback handler", auth: "None", group: "Auth" },
   { method: "GET", path: "/api/logout", description: "Log out and redirect", auth: "Required", group: "Auth" },
 
@@ -183,7 +183,7 @@ const AUTH_COLORS: Record<string, string> = {
 
 function CurlGenerator({ endpoint }: { endpoint: ApiEndpoint }) {
   const [copied, setCopied] = useState(false);
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://your-app.replit.dev";
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost:5000";
   const curl = `curl -X ${endpoint.method} \\
   ${endpoint.auth !== "None" ? "-H \"Cookie: session=...\" \\\n  " : ""}${endpoint.method !== "GET" && endpoint.body ? `-H "Content-Type: application/json" \\
   -d '${endpoint.body}' \\

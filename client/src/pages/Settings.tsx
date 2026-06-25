@@ -306,11 +306,11 @@ export default function Settings() {
                           <div>
                             <Label className="text-base font-medium">Authentication</Label>
                             <p className="text-sm text-muted-foreground mb-3">
-                              Your account is secured through Replit authentication
+                              Your account is secured through Google authentication
                             </p>
                             <Button variant="outline" disabled>
                               <Lock className="w-4 h-4 mr-2" />
-                              Managed by Replit
+                              Managed by Google
                             </Button>
                           </div>
 

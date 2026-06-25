@@ -29,8 +29,10 @@ export function useAuth() {
     }
   };
 
-  const isAdmin = user?.role === "admin";
-  const hasRole = (role: string) => user?.role === role;
+  const isAdmin = user?.role === "admin" || user?.role === "super-admin";
+  const isSuperAdmin = user?.role === "super-admin";
+  const isApproved = user?.approvalStatus === "approved" || isSuperAdmin;
+  const hasRole = (role: string) => user?.role === role || isSuperAdmin;
   const canSeePage = (pageId: string) => {
     if (isAdmin) return true;
     const visiblePages = permissions?.visiblePages || [];
@@ -44,6 +46,8 @@ export function useAuth() {
     error,
     logout,
     isAdmin,
+    isSuperAdmin,
+    isApproved,
     hasRole,
     canSeePage,
     permissions,

@@ -64,7 +64,7 @@ export default function Login() {
             </div>
 
             <div className="text-xs text-muted-foreground">
-              <p>Secure authentication powered by Replit</p>
+              <p>Secure authentication powered by Google</p>
             </div>
           </div>
         </CardContent>

@@ -2,7 +2,27 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { MemoryStorage } from "./memoryStorage";
-import { setupAuth, isAuthenticated, requireAdmin } from "./replitAuth";
+import { setupAuth, isAuthenticated, requireAdmin } from "./auth";
+import { db } from "./db";
+import { 
+  users, 
+  devotees, 
+  events, 
+  devoteePendingUpdates, 
+  polls, 
+  pollOptions, 
+  pollResponses, 
+  quizzes, 
+  quizQuestions, 
+  quizResponses, 
+  feedbackRequests, 
+  importBatches, 
+  importRecords, 
+  loginCodes, 
+  devoteeDashboardWidgets,
+  dispatchLogs
+} from "@shared/schema";
+import { eq, and, desc, ne, sql } from "drizzle-orm";
 import { devConfig } from "./devConfig";
 
 import { randomBytes } from "crypto";
@@ -23,6 +43,22 @@ const addAudit = async (action: string, entity: string, entityId: any, userId: s
     });
   } catch (e) {
     console.error("Failed to add audit log entry:", e);
+  }
+};
+
+const logDispatch = async (dispatchType: string, recipient: string, subject: string | null, body: string, status: string = "sent", contextData: any = null) => {
+  try {
+    await db.insert(dispatchLogs).values({
+      dispatchType,
+      recipient,
+      subject,
+      body,
+      status,
+      contextData: contextData ? JSON.parse(JSON.stringify(contextData)) : null,
+    });
+    console.log(`[DISPATCH LOG] [${dispatchType.toUpperCase()}] To: ${recipient} | Body: ${body}`);
+  } catch (e) {
+    console.error("Failed to add dispatch log entry:", e);
   }
 };
 import {
@@ -1170,6 +1206,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ─── GOD MODE: DISPATCH LOGS ────────────────────────────────────────────────
+  app.get('/api/admin/dispatch-logs', isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const logs = await db.select().from(dispatchLogs).orderBy(desc(dispatchLogs.sentAt)).limit(100);
+      res.json(logs);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ─── GOD MODE: MACROS ──────────────────────────────────────────────────────
   app.get('/api/admin/macros', isAuthenticated, requireAdmin, async (_req, res) => {
     try {
@@ -1220,7 +1266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const macro = await storage.getDevMacro(Number(req.params.id));
       if (!macro) return res.status(404).json({ message: "Macro not found" });
       const results: any[] = [];
-      for (const step of (macro.steps || [])) {
+      for (const step of (macro.steps as any[] || [])) {
         try {
           if (step.type === "create_devotee" && step.data) {
             const d = await storage.createDevotee(step.data);
@@ -1242,7 +1288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       await storage.incrementMacroRunCount(macro.id);
-      await addAudit("RUN_MACRO", "macro", macro.id, req.user?.claims?.sub || "system", null, { name: macro.name, steps: macro.steps?.length });
+      await addAudit("RUN_MACRO", "macro", macro.id, req.user?.claims?.sub || "system", null, { name: macro.name, steps: (macro.steps as any[])?.length });
       const updatedMacro = await storage.getDevMacro(macro.id);
       res.json({ macro: macro.name, results, ranAt: updatedMacro?.lastRunAt });
     } catch (err: any) {
@@ -1699,7 +1745,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let sql = matched.sqlQuery;
       const params: any[] = [];
       if (matched.parameters) {
-        for (const param of matched.parameters) {
+        for (const param of (matched.parameters as any[])) {
           const val = req.body[param.name] ?? req.query[param.name] ?? req.params[param.name];
           if (param.required && val === undefined) {
             return res.status(400).json({ message: `Missing required parameter: ${param.name}` });
@@ -1909,6 +1955,477 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ────────────────────────────────────────────────────────────────────────────
+  // DEVOTIONAL COMMUNITY PORTAL UPGRADES (PHASE 3)
+  // ────────────────────────────────────────────────────────────────────────────
+
+  // --- OTP Verification System ---
+  app.post('/api/admin/generate-otp', isAuthenticated, async (req: any, res) => {
+    try {
+      const code = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+      await db.insert(loginCodes).values({
+        code,
+        userId: req.user?.claims?.sub || "system",
+        purpose: "approval_otp",
+        expiresAt,
+      });
+      await logDispatch("otp", req.user?.claims?.email || "admin@example.com", "Security OTP Verification Code", `Your 6-digit verification code is: ${code}. Valid for 10 minutes.`, "sent", { userId: req.user?.claims?.sub });
+      console.log(`[VERIFICATION OTP] Generated 6-digit OTP for admin (${req.user?.claims?.email}): ${code}`);
+      res.json({ message: "OTP sent successfully (Logged to console)" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/admin/verify-otp', isAuthenticated, async (req: any, res) => {
+    const { code } = req.body;
+    try {
+      const [record] = await db.select().from(loginCodes).where(
+        and(
+          eq(loginCodes.code, code),
+          eq(loginCodes.userId, req.user?.claims?.sub || ""),
+          eq(loginCodes.purpose, "approval_otp"),
+          eq(loginCodes.isUsed, false)
+        )
+      );
+      if (!record || new Date() > record.expiresAt) {
+        return res.status(400).json({ message: "Invalid or expired OTP" });
+      }
+      await db.update(loginCodes).set({ isUsed: true }).where(eq(loginCodes.id, record.id));
+      res.json({ message: "OTP verified successfully" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // --- Approvals Routing (T002) ---
+  app.get('/api/admin/approvals', isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const pendingUsers = await db.select().from(users).where(eq(users.approvalStatus, "pending")).orderBy(desc(users.createdAt));
+      res.json(pendingUsers);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/admin/approvals/:id/approve', isAuthenticated, requireAdmin, async (req: any, res) => {
+    const { role } = req.body;
+    const targetUserId = req.params.id;
+    try {
+      const [targetUser] = await db.select().from(users).where(eq(users.id, targetUserId));
+      if (!targetUser) return res.status(404).json({ message: "User not found" });
+
+      // Super Admin check
+      if (role === "admin" && req.user.role !== "super-admin") {
+        return res.status(403).json({ message: "Only Super Admin can approve/assign Admin roles" });
+      }
+
+      const loginCode = Math.floor(1000000 + Math.random() * 9000000).toString(); // 7-digit Activation Code
+      await db.update(users).set({
+        approvalStatus: "approved",
+        role: role || "user",
+        loginCode,
+        approvedBy: req.user?.claims?.sub,
+        approvedAt: new Date(),
+      }).where(eq(users.id, targetUserId));
+
+      // Also create a linked Devotee record if it doesn't exist
+      const [existingDevotee] = await db.select().from(devotees).where(eq(devotees.email, targetUser.email || ""));
+      if (existingDevotee) {
+        await db.update(devotees).set({ userId: targetUserId, approvalStatus: "approved" }).where(eq(devotees.id, existingDevotee.id));
+      } else {
+        await db.insert(devotees).values({
+          devoteeId: `DEV-${Math.floor(1000 + Math.random() * 9000)}`,
+          firstName: targetUser.firstName || "New",
+          lastName: targetUser.lastName || "Devotee",
+          email: targetUser.email,
+          userId: targetUserId,
+          approvalStatus: "approved",
+        });
+      }
+
+      await logDispatch("email", targetUser.email || "devotee@example.com", "Devotional Portal Account Approved!", `Hare Krishna! Your account registration on the Devotional Community Portal has been approved. Your 7-digit Activation Code is: ${loginCode}. Please enter this code when logging in to activate your devotee portal.`, "sent", { targetUserId, loginCode });
+      console.log(`[APPROVAL CODE] Approved user (${targetUser.email}). Generated 7-digit Activation Code: ${loginCode}`);
+      res.json({ message: "User approved successfully", loginCode });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/admin/approvals/:id/reject', isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      await db.update(users).set({ approvalStatus: "rejected" }).where(eq(users.id, req.params.id));
+      res.json({ message: "User registration rejected" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/auth/verify-code', isAuthenticated, async (req: any, res) => {
+    const { code } = req.body;
+    try {
+      const [userRecord] = await db.select().from(users).where(eq(users.id, req.user?.claims?.sub || ""));
+      if (!userRecord || userRecord.loginCode !== code) {
+        return res.status(400).json({ message: "Invalid activation code" });
+      }
+      res.json({ message: "Activation code verified successfully!" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // --- Devotee Dashboard Page (T003) ---
+  app.get('/api/devotee/dashboard', isAuthenticated, async (req: any, res) => {
+    const userId = req.user?.claims?.sub || "";
+    try {
+      const [dev] = await db.select().from(devotees).where(eq(devotees.userId, userId));
+      if (!dev) return res.status(404).json({ message: "Devotee profile not found" });
+
+      const upcomingEvents = await db.select().from(events).where(eq(events.isDevoteeViewable, true));
+      const widgets = await db.select().from(devoteeDashboardWidgets).where(eq(devoteeDashboardWidgets.userId, userId));
+      
+      let familyMembers: any[] = [];
+      if (dev.familyId) {
+        familyMembers = await db.select().from(devotees).where(eq(devotees.familyId, dev.familyId));
+      }
+
+      res.json({ devotee: dev, upcomingEvents, widgets, familyMembers });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/devotee/profile-update', isAuthenticated, async (req: any, res) => {
+    const userId = req.user?.claims?.sub || "";
+    try {
+      const [dev] = await db.select().from(devotees).where(eq(devotees.userId, userId));
+      if (!dev) return res.status(404).json({ message: "Devotee profile not found" });
+
+      await db.insert(devoteePendingUpdates).values({
+        devoteeId: dev.id,
+        updatedData: req.body,
+        status: "pending",
+      });
+
+      res.json({ message: "Profile update request submitted for admin review!" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get('/api/admin/profile-updates', isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const list = await db.select().from(devoteePendingUpdates).where(eq(devoteePendingUpdates.status, "pending"));
+      res.json(list);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/admin/profile-updates/:id/approve', isAuthenticated, requireAdmin, async (req: any, res) => {
+    const updateId = parseInt(req.params.id);
+    try {
+      const [pending] = await db.select().from(devoteePendingUpdates).where(eq(devoteePendingUpdates.id, updateId));
+      if (!pending) return res.status(404).json({ message: "Pending update request not found" });
+
+      await db.update(devotees).set(pending.updatedData as any).where(eq(devotees.id, pending.devoteeId));
+      await db.update(devoteePendingUpdates).set({
+        status: "approved",
+        reviewedBy: req.user?.claims?.sub,
+        reviewedAt: new Date(),
+      }).where(eq(devoteePendingUpdates.id, updateId));
+
+      res.json({ message: "Devotee profile changes successfully merged!" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/admin/profile-updates/:id/reject', isAuthenticated, requireAdmin, async (req: any, res) => {
+    const updateId = parseInt(req.params.id);
+    const { reason } = req.body;
+    try {
+      await db.update(devoteePendingUpdates).set({
+        status: "rejected",
+        reviewedBy: req.user?.claims?.sub,
+        reviewedAt: new Date(),
+        rejectionReason: reason,
+      }).where(eq(devoteePendingUpdates.id, updateId));
+      res.json({ message: "Profile update rejected" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // --- Polls & Quizzes (T005) ---
+  app.get('/api/polls', isAuthenticated, async (req, res) => {
+    try {
+      const allPolls = await db.select().from(polls).orderBy(desc(polls.createdAt));
+      const pollsWithOptions = await Promise.all(allPolls.map(async (poll) => {
+        const options = await db.select().from(pollOptions).where(eq(pollOptions.pollId, poll.id));
+        const responses = await db.select().from(pollResponses).where(eq(pollResponses.pollId, poll.id));
+        return { ...poll, options, responses };
+      }));
+      res.json(pollsWithOptions);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/polls', isAuthenticated, requireAdmin, async (req: any, res) => {
+    const { title, description, mediaUrl, mediaType, options } = req.body;
+    try {
+      const [newPoll] = await db.insert(polls).values({
+        title,
+        description,
+        mediaUrl,
+        mediaType,
+        createdBy: req.user?.claims?.sub || "admin",
+      }).returning();
+
+      if (options && options.length > 0) {
+        for (const optText of options) {
+          await db.insert(pollOptions).values({
+            pollId: newPoll.id,
+            optionText: optText,
+          });
+        }
+      }
+      res.status(201).json(newPoll);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/polls/:id/vote', isAuthenticated, async (req: any, res) => {
+    const pollId = parseInt(req.params.id);
+    const { optionId } = req.body;
+    const userId = req.user?.claims?.sub || "";
+    try {
+      const [existingVote] = await db.select().from(pollResponses).where(
+        and(
+          eq(pollResponses.pollId, pollId),
+          eq(pollResponses.userId, userId)
+        )
+      );
+      if (existingVote) return res.status(400).json({ message: "You have already voted on this poll" });
+
+      await db.insert(pollResponses).values({
+        pollId,
+        optionId,
+        userId,
+      });
+      res.json({ message: "Vote cast successfully!" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get('/api/quizzes', isAuthenticated, async (req, res) => {
+    try {
+      const allQuizzes = await db.select().from(quizzes).orderBy(desc(quizzes.createdAt));
+      const quizzesWithQuestions = await Promise.all(allQuizzes.map(async (q) => {
+        const questions = await db.select().from(quizQuestions).where(eq(quizQuestions.quizId, q.id));
+        return { ...q, questions };
+      }));
+      res.json(quizzesWithQuestions);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/quizzes', isAuthenticated, requireAdmin, async (req: any, res) => {
+    const { title, description, questions } = req.body;
+    try {
+      const [newQuiz] = await db.insert(quizzes).values({
+        title,
+        description,
+        createdBy: req.user?.claims?.sub || "admin",
+      }).returning();
+
+      if (questions && questions.length > 0) {
+        for (const q of questions) {
+          await db.insert(quizQuestions).values({
+            quizId: newQuiz.id,
+            questionText: q.questionText,
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+          });
+        }
+      }
+      res.status(201).json(newQuiz);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/quizzes/:id/submit', isAuthenticated, async (req: any, res) => {
+    const quizId = parseInt(req.params.id);
+    const { answers } = req.body; // e.g., { questionId: "selectedAnswer" }
+    const userId = req.user?.claims?.sub || "";
+    try {
+      const questionsList = await db.select().from(quizQuestions).where(eq(quizQuestions.quizId, quizId));
+      let score = 0;
+      for (const q of questionsList) {
+        if (answers[q.id] === q.correctAnswer) {
+          score++;
+        }
+      }
+
+      await db.insert(quizResponses).values({
+        quizId,
+        userId,
+        answers,
+        score,
+      });
+
+      res.json({ score, totalQuestions: questionsList.length });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // --- Feedback System (T006) ---
+  app.get('/api/feedback', isAuthenticated, async (req: any, res) => {
+    const userId = req.user?.claims?.sub || "";
+    try {
+      let list;
+      if (req.user.role === "admin" || req.user.role === "super-admin") {
+        list = await db.select().from(feedbackRequests).orderBy(desc(feedbackRequests.createdAt));
+      } else {
+        list = await db.select().from(feedbackRequests).where(eq(feedbackRequests.userId, userId)).orderBy(desc(feedbackRequests.createdAt));
+      }
+      res.json(list);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/feedback', isAuthenticated, async (req: any, res) => {
+    const { title, description, category } = req.body;
+    try {
+      const [newFeedback] = await db.insert(feedbackRequests).values({
+        userId: req.user?.claims?.sub || "",
+        title,
+        description,
+        category,
+      }).returning();
+      res.status(201).json(newFeedback);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/feedback/:id/status', isAuthenticated, requireAdmin, async (req, res) => {
+    const feedbackId = parseInt(req.params.id);
+    const { status, adminNotes } = req.body;
+    try {
+      await db.update(feedbackRequests).set({
+        status,
+        adminNotes,
+        updatedAt: new Date(),
+      }).where(eq(feedbackRequests.id, feedbackId));
+      res.json({ message: "Feedback status updated!" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // --- Intelligent Excel/CSV Imports (T004) ---
+  app.post('/api/admin/import/upload', isAuthenticated, requireAdmin, async (req: any, res) => {
+    const { fileName, records } = req.body; // simulated JSON format parse of Excel/CSV
+    const userId = req.user?.claims?.sub || "admin";
+    try {
+      const [batch] = await db.insert(importBatches).values({
+        fileName,
+        totalRecords: records.length,
+        importedBy: userId,
+      }).returning();
+
+      let createdCount = 0;
+      let updatedCount = 0;
+
+      for (const record of records) {
+        // Smart matching criteria: match on email, phone, or name combo
+        let existingDevotee = null;
+        if (record.email) {
+          [existingDevotee] = await db.select().from(devotees).where(eq(devotees.email, record.email));
+        }
+        if (!existingDevotee && record.phone) {
+          [existingDevotee] = await db.select().from(devotees).where(eq(devotees.phone, record.phone));
+        }
+        if (!existingDevotee && record.firstName && record.lastName) {
+          [existingDevotee] = await db.select().from(devotees).where(
+            and(
+              eq(devotees.firstName, record.firstName),
+              eq(devotees.lastName, record.lastName)
+            )
+          );
+        }
+
+        if (existingDevotee) {
+          // Track for rollback
+          await db.insert(importRecords).values({
+            batchId: batch.id,
+            devoteeId: existingDevotee.id,
+            action: "update",
+            originalData: record,
+            previousData: existingDevotee,
+          });
+
+          // Perform merge: update columns that are supplied
+          await db.update(devotees).set({
+            ...record,
+            updatedAt: new Date(),
+          }).where(eq(devotees.id, existingDevotee.id));
+          updatedCount++;
+        } else {
+          // Generate devotee ID
+          const code = `DEV-${Math.floor(1000 + Math.random() * 9000)}`;
+          const [newDev] = await db.insert(devotees).values({
+            ...record,
+            devoteeId: record.devoteeId || code,
+          }).returning();
+
+          await db.insert(importRecords).values({
+            batchId: batch.id,
+            devoteeId: newDev.id,
+            action: "create",
+            originalData: record,
+          });
+          createdCount++;
+        }
+      }
+
+      await db.update(importBatches).set({
+        createdRecordsCount: createdCount,
+        updatedRecordsCount: updatedCount,
+      }).where(eq(importBatches.id, batch.id));
+
+      res.json({ batchId: batch.id, createdCount, updatedCount });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/admin/import/rollback/:batchId', isAuthenticated, requireAdmin, async (req, res) => {
+    const batchId = parseInt(req.params.batchId);
+    try {
+      const recordsToRollback = await db.select().from(importRecords).where(eq(importRecords.batchId, batchId));
+      for (const rec of recordsToRollback) {
+        if (rec.action === "create" && rec.devoteeId) {
+          await db.delete(devotees).where(eq(devotees.id, rec.devoteeId));
+        } else if (rec.action === "update" && rec.devoteeId && rec.previousData) {
+          await db.update(devotees).set(rec.previousData as any).where(eq(devotees.id, rec.devoteeId));
+        }
+      }
+      await db.update(importBatches).set({ status: "rolled_back" }).where(eq(importBatches.id, batchId));
+      res.json({ message: "Import batch rolled back successfully!" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Heart, Plus, IndianRupee, CreditCard, Banknote, Gift, Edit, Trash2, CheckCircle, Clock, Search, Printer, X } from "lucide-react";
+import { Heart, Plus, IndianRupee, CreditCard, Banknote, Gift, Edit, Trash2, CheckCircle, Clock, Search, Printer, X, Award, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
@@ -58,6 +58,9 @@ export default function Donations() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editDonation, setEditDonation] = useState<Donation | null>(null);
   const [receiptDonation, setReceiptDonation] = useState<Donation | null>(null);
+  const [isTaxModalOpen, setIsTaxModalOpen] = useState(false);
+  const [selectedTaxDevoteeId, setSelectedTaxDevoteeId] = useState("");
+  const [selectedTaxYear, setSelectedTaxYear] = useState(new Date().getFullYear().toString());
   const [formData, setFormData] = useState({
     devoteeId: "", amount: "", currency: "INR", donationType: "cash", purpose: "",
     donationDate: new Date().toISOString().slice(0, 10), paymentMethod: "cash",
@@ -225,6 +228,9 @@ export default function Donations() {
                     <SelectItem value="cancelled">Cancelled</SelectItem>
                   </SelectContent>
                 </Select>
+                 <Button onClick={() => setIsTaxModalOpen(true)} variant="outline" className="border-primary/30 hover:bg-primary/5 text-primary">
+                  <Award className="w-4 h-4 mr-2" /> Annual Tax Certificate
+                </Button>
                 <Button onClick={openAdd} className="bg-gradient-to-r from-primary to-secondary">
                   <Plus className="w-4 h-4 mr-2" /> Record Donation
                 </Button>
@@ -429,6 +435,183 @@ export default function Donations() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* ── ANNUAL TAX CERTIFICATE MODAL ────────────────────── */}
+      <Dialog open={isTaxModalOpen} onOpenChange={setIsTaxModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Award className="w-5 h-5 text-primary" /> Generate Annual Tax Certificate
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 print:p-0">
+            {/* Controls */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-muted/30 p-4 rounded-lg border border-border/40">
+              <div className="space-y-1.5">
+                <Label>Select Devotee</Label>
+                <Select value={selectedTaxDevoteeId} onValueChange={setSelectedTaxDevoteeId}>
+                  <SelectTrigger><SelectValue placeholder="Choose devotee..." /></SelectTrigger>
+                  <SelectContent>
+                    {devotees.map((dv: Devotee) => (
+                      <SelectItem key={dv.id} value={String(dv.id)}>{dv.firstName} {dv.lastName} ({dv.devoteeId})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Financial Year</Label>
+                <Select value={selectedTaxYear} onValueChange={setSelectedTaxYear}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2026">2026 - 2027</SelectItem>
+                    <SelectItem value="2025">2025 - 2026</SelectItem>
+                    <SelectItem value="2024">2024 - 2025</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {selectedTaxDevoteeId && (
+              (() => {
+                const devoteeIdNum = parseInt(selectedTaxDevoteeId);
+                const devotee = devotees.find(d => d.id === devoteeIdNum);
+                if (!devotee) return null;
+
+                const startYear = parseInt(selectedTaxYear);
+                const startDate = new Date(startYear, 3, 1); // April 1st
+                const endDate = new Date(startYear + 1, 2, 31, 23, 59, 59); // March 31st
+
+                const devoteeDonations = donations.filter(d => 
+                  d.devoteeId === devoteeIdNum &&
+                  d.status === "received" &&
+                  new Date(d.donationDate) >= startDate &&
+                  new Date(d.donationDate) <= endDate
+                );
+
+                const totalAmount = devoteeDonations.reduce((sum, d) => sum + parseFloat(d.amount), 0);
+
+                return (
+                  <div className="space-y-4">
+                    {/* Print Preview Container */}
+                    <div id="tax-print-area" className="border border-border p-6 rounded-lg bg-card text-foreground font-sans relative">
+                      <div className="absolute inset-2 border border-amber-500/10 pointer-events-none rounded"></div>
+                      
+                      {/* Receipt Header */}
+                      <div className="flex justify-between items-start gap-4 pb-4 border-b border-border/80">
+                        <div className="space-y-1 text-left">
+                          <h2 className="text-xl font-bold text-amber-700 dark:text-amber-500">Madhav Parivar</h2>
+                          <p className="text-xs text-muted-foreground">Devotional Community & Charitable Trust</p>
+                          <p className="text-[10px] text-muted-foreground">Reg No: MP-CT-2026-9874 | Sector-6, Dwarka, New Delhi</p>
+                        </div>
+                        <div className="text-right space-y-1">
+                          <Badge variant="outline" className="border-amber-600/30 text-amber-700 font-bold bg-amber-500/5">TAX EXEMPT RECEIPT</Badge>
+                          <p className="text-xs text-muted-foreground">FY: {selectedTaxYear} - {parseInt(selectedTaxYear) + 1}</p>
+                          <p className="text-[10px] text-muted-foreground">Generated: {new Date().toLocaleDateString('en-IN')}</p>
+                        </div>
+                      </div>
+
+                      {/* Main Title */}
+                      <div className="py-6 text-center">
+                        <h3 className="text-md font-bold tracking-wider text-foreground uppercase">Annual Donation Certificate</h3>
+                        <p className="text-xs text-muted-foreground mt-1">Issued under Section 80G of the Income Tax Act</p>
+                      </div>
+
+                      {/* Devotee Info Summary */}
+                      <div className="grid grid-cols-2 gap-4 text-xs pb-4 border-b border-dashed border-border">
+                        <div>
+                          <p className="text-muted-foreground text-[10px] uppercase font-semibold">Devotee Details</p>
+                          <p className="font-bold text-sm mt-0.5">{devotee.firstName} {devotee.lastName}</p>
+                          <p className="text-muted-foreground mt-0.5">ID: {devotee.devoteeId}</p>
+                          <p className="text-muted-foreground mt-0.5">{devotee.address || "No Address Added"}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-muted-foreground text-[10px] uppercase font-semibold">Financial Summary</p>
+                          <p className="text-xl font-black text-green-700 dark:text-green-400 mt-1">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                          <p className="text-muted-foreground mt-0.5 text-[10px]">Total Tax-Deductible Contributions</p>
+                        </div>
+                      </div>
+
+                      {/* Donations list */}
+                      <div className="py-4">
+                        <p className="text-muted-foreground text-[10px] uppercase font-semibold mb-2">Contribution Breakdown</p>
+                        {devoteeDonations.length === 0 ? (
+                          <p className="text-xs text-muted-foreground italic text-center py-4">No approved donations recorded in this financial year.</p>
+                        ) : (
+                          <table className="w-full text-xs text-left border-collapse">
+                            <thead>
+                              <tr className="border-b border-border/80 text-muted-foreground">
+                                <th className="py-1.5 font-bold">Date</th>
+                                <th className="py-1.5 font-bold">Receipt No.</th>
+                                <th className="py-1.5 font-bold">Method</th>
+                                <th className="py-1.5 font-bold">Purpose</th>
+                                <th className="py-1.5 font-bold text-right">Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/40">
+                              {devoteeDonations.map(d => (
+                                <tr key={d.id} className="text-muted-foreground">
+                                  <td className="py-1.5">{new Date(d.donationDate).toLocaleDateString('en-IN')}</td>
+                                  <td className="py-1.5 font-mono">#{d.receiptNumber || `RCP-${d.id}`}</td>
+                                  <td className="py-1.5 capitalize">{d.paymentMethod || d.donationType}</td>
+                                  <td className="py-1.5">{d.purpose || "General Offering"}</td>
+                                  <td className="py-1.5 text-right font-bold text-foreground">₹{parseFloat(d.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+
+                      {/* Footer signatures and verification */}
+                      <div className="pt-6 border-t border-border flex justify-between items-end gap-6 text-xs mt-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-14 h-14 bg-muted border border-border flex flex-col items-center justify-center rounded p-1 text-center shrink-0">
+                            <span className="text-[7px] text-muted-foreground">VERIFIED</span>
+                            <div className="w-8 h-8 border border-dashed border-primary/40 rounded flex items-center justify-center mt-0.5">
+                              <ShieldCheck className="w-5 h-5 text-amber-600" />
+                            </div>
+                          </div>
+                          <div className="space-y-1 text-muted-foreground">
+                            <p className="text-[9px] font-semibold text-foreground">Declaration</p>
+                            <p className="text-[8px] max-w-sm leading-tight">This certificate certifies that the above donations were received towards the charitable goals of Madhav Parivar. All contributions are eligible for exemption under local tax guidelines.</p>
+                          </div>
+                        </div>
+                        <div className="text-center w-36 space-y-1">
+                          <div className="h-8 border-b border-border/80 relative">
+                            <span className="absolute bottom-1 right-8 font-serif text-[10px] italic text-amber-700">Madhav P.</span>
+                          </div>
+                          <p className="text-[9px] text-muted-foreground">Authorized Signatory</p>
+                          <p className="text-[8px] text-muted-foreground">Treasurer, Madhav Parivar</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex justify-end gap-2">
+                      <Button variant="ghost" onClick={() => setIsTaxModalOpen(false)}>Close</Button>
+                      <Button
+                        disabled={devoteeDonations.length === 0}
+                        onClick={() => {
+                          const area = document.getElementById("tax-print-area");
+                          if (!area) return;
+                          const win = window.open("", "_blank", "width=800,height=850");
+                          if (!win) return;
+                          win.document.write(`<html><head><title>Annual Tax Certificate - ${devotee.firstName} ${devotee.lastName}</title><style>body{font-family:sans-serif;padding:30px;}table{width:100%;border-collapse:collapse;}th,td{border-bottom:1px solid #ddd;padding:8px;text-align:left;}th{background:#f9f9f9;}</style></head><body>${area.innerHTML}</body></html>`);
+                          win.document.close();
+                          win.print();
+                        }}
+                        className="bg-amber-600 hover:bg-amber-700 text-white font-medium shadow-md shadow-amber-500/10"
+                      >
+                        <Printer className="w-4 h-4 mr-2" /> Print Annual Certificate
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })()
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">

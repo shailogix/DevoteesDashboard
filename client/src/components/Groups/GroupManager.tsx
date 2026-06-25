@@ -54,7 +54,7 @@ export function GroupManager({
                 <div key={group.id} className="p-4 border border-border rounded-lg">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <h3 className="font-medium text-foreground">{group.name}</h3>
+                      <h3 className="font-medium text-foreground">{group.groupName}</h3>
                       <p className="text-sm text-muted-foreground">
                         {group.currentMembers} members • {group.groupType}
                       </p>

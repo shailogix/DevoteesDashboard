@@ -17,17 +17,21 @@ import {
   CalendarDays, HandHeart, BarChart3, Settings, CreditCard,
   LogOut, Code2, Layers, Sparkles, ChevronDown, ChevronRight,
   Plus, Users2, Globe, BookOpen, Landmark, MapPin, Bell, Leaf, Mountain, X,
-  FileText
+  FileText, Vote, Trophy, MessageSquare, Database
 } from "lucide-react";
 
 const ICON_MAP: Record<string, any> = {
   Home, Users, Building, GraduationCap, Calendar, Heart,
   CalendarDays, HandHeart, BarChart3, Settings, CreditCard,
   Layers, Sparkles, Code2, Landmark, MapPin, Bell, Users2,
+  Vote, Trophy, MessageSquare, Database,
 };
 
 const DEFAULT_NAVIGATION = [
   { id: "dashboard", name: "Dashboard", href: "/", icon: "Home", visible: true },
+  { id: "polls-quizzes", name: "Polls & Quizzes", href: "/polls-quizzes", icon: "Vote", visible: true },
+  { id: "feedback", name: "Feedback", href: "/feedback", icon: "MessageSquare", visible: true },
+  { id: "import-data", name: "Intelligent Import", href: "/import-data", icon: "Database", visible: true },
   { id: "devotees", name: "Devotees", href: "/devotees", icon: "Users", visible: true },
   { id: "families", name: "Families", href: "/families", icon: "Building", visible: true },
   { id: "mandals", name: "Mandals", href: "/mandals", icon: "Landmark", visible: true },
@@ -204,7 +208,11 @@ export function Sidebar() {
         .filter((n: any) => n.visible)
     : DEFAULT_NAVIGATION;
 
-  const ADMIN_ONLY_PAGES = ["analytics", "id-cards"];
+  const ADMIN_ONLY_PAGES = [
+    "analytics", "id-cards", "devotees", "families", "mandals",
+    "sabha-locations", "groups", "mentors", "attendance", "donations",
+    "events", "volunteering", "import-data"
+  ];
 
   const navItems = featureFlags
     ? rawNavItems.filter((item) => {
@@ -213,9 +221,8 @@ export function Sidebar() {
         )?.[0];
         if (!flagKey) return true;
         if (featureFlags[flagKey] === false) return false;
-        // Role-based filtering: hide admin-only pages for non-admins
+        // Role-based filtering
         if (!isAdmin && ADMIN_ONLY_PAGES.includes(item.id)) return false;
-        // Config-based page permissions from devConfig
         if (!isAdmin && !canSeePage(item.id)) return false;
         return true;
       })
@@ -272,7 +279,7 @@ export function Sidebar() {
                 data-testid={`nav-link-${item.id || item.href.replace(/\//g, "")}`}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
-                <span className="break-words min-w-0">{item.name}</span>
+                <span className="break-words min-w-0">{!isAdmin && item.id === "dashboard" ? "Devotee Portal" : item.name}</span>
               </div>
             </Link>
           );
@@ -432,7 +439,7 @@ export function Sidebar() {
       <div className="p-4 border-t border-border">
         <div className="flex items-center space-x-3">
           <Avatar className="w-10 h-10">
-            <AvatarImage src={user?.profileImageUrl} alt={user?.firstName} />
+            <AvatarImage src={user?.profileImageUrl || undefined} alt={user?.firstName || undefined} />
             <AvatarFallback>
               {user?.firstName?.[0]}
               {user?.lastName?.[0]}

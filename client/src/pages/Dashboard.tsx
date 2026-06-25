@@ -24,11 +24,11 @@ export default function Dashboard() {
   const [bulkMessage, setBulkMessage] = useState("");
   const [, navigate] = useLocation();
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["/api/stats"],
   });
 
-  const { data: groups } = useQuery({
+  const { data: groups = [] } = useQuery<any[]>({
     queryKey: ["/api/groups"],
   });
 

@@ -44,7 +44,7 @@ export function DevoteeProfile({ devotee, onEdit, onClose }: DevoteeProfileProps
     return age;
   };
 
-  const age = calculateAge(devotee.dateOfBirth);
+  const age = calculateAge(devotee.dateOfBirth || undefined);
 
   return (
     <div className="space-y-6">

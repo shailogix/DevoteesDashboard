@@ -25,6 +25,11 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   isActive: boolean("is_active").notNull().default(true),
+  approvalStatus: varchar("approval_status").notNull().default("pending"), // pending, approved, rejected
+  loginCode: varchar("login_code"),
+  approvedBy: varchar("approved_by"),
+  approvedAt: timestamp("approved_at"),
+  isDevotee: boolean("is_devotee").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -33,6 +38,8 @@ export const users = pgTable("users", {
 export const devotees = pgTable("devotees", {
   id: serial("id").primaryKey(),
   devoteeId: varchar("devotee_id").unique().notNull(),
+  userId: varchar("user_id").references(() => users.id),
+  approvalStatus: varchar("approval_status").notNull().default("approved"), // approved, pending, rejected
   firstName: varchar("first_name").notNull(),
   lastName: varchar("last_name").notNull(),
   email: varchar("email").unique(),
@@ -120,6 +127,8 @@ export const events = pgTable("events", {
   archivedAt: timestamp("archived_at"),
   maxParticipants: integer("max_participants"),
   createdBy: varchar("created_by"),
+  isPublic: boolean("is_public").notNull().default(true),
+  isDevoteeViewable: boolean("is_devotee_viewable").notNull().default(true),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -294,6 +303,18 @@ export const auditLog = pgTable("audit_log", {
   beforeData: jsonb("before_data"),
   afterData: jsonb("after_data"),
   timestamp: timestamp("timestamp").defaultNow(),
+});
+
+// Dispatch Log storage table
+export const dispatchLogs = pgTable("dispatch_log", {
+  id: serial("id").primaryKey(),
+  dispatchType: varchar("dispatch_type", { length: 50 }).notNull(), // 'email', 'sms', 'otp', 'whatsapp'
+  recipient: varchar("recipient", { length: 255 }).notNull(),
+  subject: varchar("subject", { length: 255 }),
+  body: text("body").notNull(),
+  status: varchar("status", { length: 50 }).notNull().default("sent"), // 'sent', 'failed', 'pending'
+  sentAt: timestamp("sent_at").defaultNow(),
+  contextData: jsonb("context_data"),
 });
 
 // Visual Overrides storage table
@@ -500,6 +521,158 @@ export const pageRegistryRelations = relations(pageRegistry, ({}) => ({}));
 export const schemaRegistryRelations = relations(schemaRegistry, ({}) => ({}));
 export const routeRegistryRelations = relations(routeRegistry, ({}) => ({}));
 
+// devotee_pending_updates
+export const devoteePendingUpdates = pgTable("devotee_pending_updates", {
+  id: serial("id").primaryKey(),
+  devoteeId: integer("devotee_id").notNull(),
+  updatedData: jsonb("updated_data").notNull(),
+  status: varchar("status").notNull().default("pending"), // pending, approved, rejected
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  reviewedBy: varchar("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  rejectionReason: text("rejection_reason"),
+});
+
+// polls
+export const polls = pgTable("polls", {
+  id: serial("id").primaryKey(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  mediaUrl: varchar("media_url"), // video or image URL
+  mediaType: varchar("media_type"), // video or image
+  isActive: boolean("is_active").notNull().default(true),
+  expiresAt: timestamp("expires_at"),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// poll_options
+export const pollOptions = pgTable("poll_options", {
+  id: serial("id").primaryKey(),
+  pollId: integer("poll_id").notNull(),
+  optionText: varchar("option_text").notNull(),
+});
+
+// poll_responses
+export const pollResponses = pgTable("poll_responses", {
+  id: serial("id").primaryKey(),
+  pollId: integer("poll_id").notNull(),
+  optionId: integer("option_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  votedAt: timestamp("voted_at").defaultNow(),
+});
+
+// quizzes
+export const quizzes = pgTable("quizzes", {
+  id: serial("id").primaryKey(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  expiresAt: timestamp("expires_at"),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// quiz_questions
+export const quizQuestions = pgTable("quiz_questions", {
+  id: serial("id").primaryKey(),
+  quizId: integer("quiz_id").notNull(),
+  questionText: text("question_text").notNull(),
+  options: jsonb("options").notNull(), // array of options (strings)
+  correctAnswer: varchar("correct_answer").notNull(), // index or string matching correct option
+});
+
+// quiz_responses
+export const quizResponses = pgTable("quiz_responses", {
+  id: serial("id").primaryKey(),
+  quizId: integer("quiz_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  answers: jsonb("answers").notNull(), // object mapping questionId to selected option
+  score: integer("score"),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+});
+
+// feedback_requests
+export const feedbackRequests = pgTable("feedback_requests", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  title: varchar("title").notNull(),
+  description: text("description").notNull(),
+  category: varchar("category").notNull(), // bug, feature, suggestion, other
+  status: varchar("status").notNull().default("pending"), // pending, approved, implemented, rejected
+  adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// import_batches
+export const importBatches = pgTable("import_batches", {
+  id: serial("id").primaryKey(),
+  fileName: varchar("file_name").notNull(),
+  status: varchar("status").notNull().default("completed"), // completed, rolled_back
+  totalRecords: integer("total_records").notNull(),
+  createdRecordsCount: integer("created_records_count").notNull().default(0),
+  updatedRecordsCount: integer("updated_records_count").notNull().default(0),
+  importedBy: varchar("imported_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// import_records
+export const importRecords = pgTable("import_records", {
+  id: serial("id").primaryKey(),
+  batchId: integer("batch_id").notNull(),
+  devoteeId: integer("devotee_id"), // link to imported/updated devotee
+  action: varchar("action").notNull(), // create, update
+  originalData: jsonb("original_data").notNull(),
+  previousData: jsonb("previous_data"), // for rollback
+});
+
+// login_codes (used for approval verification codes & OTPs)
+export const loginCodes = pgTable("login_codes", {
+  id: serial("id").primaryKey(),
+  code: varchar("code", { length: 7 }).notNull(),
+  userId: varchar("user_id").notNull(),
+  purpose: varchar("purpose").notNull(), // sign_up, approval_otp
+  isUsed: boolean("is_used").notNull().default(false),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// devotee_dashboard_widgets
+export const devoteeDashboardWidgets = pgTable("devotee_dashboard_widgets", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  widgetType: varchar("widget_type").notNull(),
+  config: jsonb("config").notNull().default({}),
+  isActive: boolean("is_active").notNull().default(true),
+  position: integer("position").notNull().default(0),
+});
+
+// Relations for new tables
+export const pollsRelations = relations(polls, ({ many }) => ({
+  options: many(pollOptions),
+  responses: many(pollResponses),
+}));
+
+export const pollOptionsRelations = relations(pollOptions, ({ one }) => ({
+  poll: one(polls, {
+    fields: [pollOptions.pollId],
+    references: [polls.id],
+  }),
+}));
+
+export const quizzesRelations = relations(quizzes, ({ many }) => ({
+  questions: many(quizQuestions),
+  responses: many(quizResponses),
+}));
+
+export const quizQuestionsRelations = relations(quizQuestions, ({ one }) => ({
+  quiz: one(quizzes, {
+    fields: [quizQuestions.quizId],
+    references: [quizzes.id],
+  }),
+}));
+
 // Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users).pick({
   id: true,
@@ -606,6 +779,11 @@ export const insertAuditLogSchema = createInsertSchema(auditLog).omit({
   timestamp: true,
 });
 
+export const insertDispatchLogSchema = createInsertSchema(dispatchLogs).omit({
+  id: true,
+  sentAt: true,
+});
+
 export const insertVisualOverrideSchema = createInsertSchema(visualOverrides).omit({
   id: true,
   createdAt: true,
@@ -633,9 +811,93 @@ export const insertRouteRegistrySchema = createInsertSchema(routeRegistry).omit(
   createdAt: true,
 });
 
+// Zod schemas for new tables
+export const insertDevoteePendingUpdateSchema = createInsertSchema(devoteePendingUpdates).omit({
+  id: true,
+  submittedAt: true,
+  reviewedAt: true,
+});
+export const insertPollSchema = createInsertSchema(polls).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertPollOptionSchema = createInsertSchema(pollOptions).omit({
+  id: true,
+});
+export const insertPollResponseSchema = createInsertSchema(pollResponses).omit({
+  id: true,
+  votedAt: true,
+});
+export const insertQuizSchema = createInsertSchema(quizzes).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertQuizQuestionSchema = createInsertSchema(quizQuestions).omit({
+  id: true,
+});
+export const insertQuizResponseSchema = createInsertSchema(quizResponses).omit({
+  id: true,
+  submittedAt: true,
+});
+export const insertFeedbackRequestSchema = createInsertSchema(feedbackRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const insertImportBatchSchema = createInsertSchema(importBatches).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertImportRecordSchema = createInsertSchema(importRecords).omit({
+  id: true,
+});
+export const insertLoginCodeSchema = createInsertSchema(loginCodes).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertDevoteeDashboardWidgetSchema = createInsertSchema(devoteeDashboardWidgets).omit({
+  id: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+export type InsertDevoteePendingUpdate = z.infer<typeof insertDevoteePendingUpdateSchema>;
+export type DevoteePendingUpdate = typeof devoteePendingUpdates.$inferSelect;
+
+export type InsertPoll = z.infer<typeof insertPollSchema>;
+export type Poll = typeof polls.$inferSelect;
+
+export type InsertPollOption = z.infer<typeof insertPollOptionSchema>;
+export type PollOption = typeof pollOptions.$inferSelect;
+
+export type InsertPollResponse = z.infer<typeof insertPollResponseSchema>;
+export type PollResponse = typeof pollResponses.$inferSelect;
+
+export type InsertQuiz = z.infer<typeof insertQuizSchema>;
+export type Quiz = typeof quizzes.$inferSelect;
+
+export type InsertQuizQuestion = z.infer<typeof insertQuizQuestionSchema>;
+export type QuizQuestion = typeof quizQuestions.$inferSelect;
+
+export type InsertQuizResponse = z.infer<typeof insertQuizResponseSchema>;
+export type QuizResponse = typeof quizResponses.$inferSelect;
+
+export type InsertFeedbackRequest = z.infer<typeof insertFeedbackRequestSchema>;
+export type FeedbackRequest = typeof feedbackRequests.$inferSelect;
+
+export type InsertImportBatch = z.infer<typeof insertImportBatchSchema>;
+export type ImportBatch = typeof importBatches.$inferSelect;
+
+export type InsertImportRecord = z.infer<typeof insertImportRecordSchema>;
+export type ImportRecord = typeof importRecords.$inferSelect;
+
+export type InsertLoginCode = z.infer<typeof insertLoginCodeSchema>;
+export type LoginCode = typeof loginCodes.$inferSelect;
+
+export type InsertDevoteeDashboardWidget = z.infer<typeof insertDevoteeDashboardWidgetSchema>;
+export type DevoteeDashboardWidget = typeof devoteeDashboardWidgets.$inferSelect;
 
 export type InsertDevotee = z.infer<typeof insertDevoteeSchema>;
 export type Devotee = typeof devotees.$inferSelect;
@@ -687,6 +949,9 @@ export type DevMacro = typeof devMacros.$inferSelect;
 
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLogEntry = typeof auditLog.$inferSelect;
+
+export type InsertDispatchLog = z.infer<typeof insertDispatchLogSchema>;
+export type DispatchLog = typeof dispatchLogs.$inferSelect;
 
 export type InsertVisualOverride = z.infer<typeof insertVisualOverrideSchema>;
 export type VisualOverride = typeof visualOverrides.$inferSelect;

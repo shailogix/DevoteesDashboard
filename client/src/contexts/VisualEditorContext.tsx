@@ -82,12 +82,12 @@ function getDomPath(el: HTMLElement): string {
   let cur: HTMLElement | null = el;
   while (cur && cur !== document.body) {
     const tag = cur.tagName.toLowerCase();
-    const parent = cur.parentElement;
-    if (!parent) break;
-    const sameTagSiblings = Array.from(parent.children).filter(c => c.tagName === cur!.tagName);
+    const parentEl: HTMLElement | null = cur.parentElement;
+    if (!parentEl) break;
+    const sameTagSiblings = Array.from(parentEl.children).filter((c: any) => c.tagName === cur!.tagName);
     const idx = sameTagSiblings.indexOf(cur);
     parts.unshift(`${tag}[${idx}]`);
-    cur = parent;
+    cur = parentEl;
   }
   return parts.join('/');
 }

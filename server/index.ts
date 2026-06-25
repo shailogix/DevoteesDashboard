@@ -44,7 +44,7 @@ app.use((req, res, next) => {
   if (process.env.NODE_ENV !== "production") {
     try {
       await seedDemoData();
-    } catch (error) {
+    } catch (error: any) {
       console.log("Demo data already exists or seeding failed:", error.message);
     }
   }
@@ -70,11 +70,14 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = 5000;
-  server.listen({
+  const listenOptions: any = {
     port,
     host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
+  };
+  if (process.platform !== "win32") {
+    listenOptions.reusePort = true;
+  }
+  server.listen(listenOptions, () => {
     console.log(`serving on port ${port}`);
   });
 })();

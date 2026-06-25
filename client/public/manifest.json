@@ -1,0 +1,17 @@
+{
+  "short_name": "Madhav Parivar",
+  "name": "Madhav Parivar Devotional Community Portal",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3246/3246385.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#ffffff",
+  "theme_color": "#d97706",
+  "display": "standalone",
+  "orientation": "portrait"
+}
