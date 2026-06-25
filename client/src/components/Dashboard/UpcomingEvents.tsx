@@ -2,17 +2,26 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, MapPin, Clock, Users, Archive, ChevronRight } from "lucide-react";
+import { CalendarDays, MapPin, Clock, Users, Archive, ChevronRight, Check, Share2, CalendarPlus } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Event } from "@shared/schema";
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
-  festival: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
-  satsang: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
-  workshop: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  meeting: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+  festival: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300 border-orange-200/50",
+  satsang: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-amber-200/50",
+  workshop: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200/50",
+  meeting: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-200/50",
+};
+
+// Gorgeous Unsplash images matching event categories
+const EVENT_IMAGES: Record<string, string> = {
+  festival: "https://images.unsplash.com/photo-1545128485-c400e7702796?w=600&q=80", // sacred lights/festivity
+  satsang: "https://images.unsplash.com/photo-1609137144814-7e045bc9050d?w=600&q=80", // lotus / spiritual flower
+  workshop: "https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?w=600&q=80", // group learning/study
+  meeting: "https://images.unsplash.com/photo-1521737711867-e3b90473bd58?w=600&q=80", // community discussion
+  fallback: "https://images.unsplash.com/photo-1602751584552-8ba73aad10e1?w=600&q=80", // mandir sunset entrance
 };
 
 function daysUntil(date: string | Date) {
@@ -33,6 +42,28 @@ export function UpcomingEvents() {
     queryKey: ["/api/events"],
   });
 
+  const { data: myRsvps = [] } = useQuery<any[]>({
+    queryKey: ["/api/events/rsvps"],
+  });
+
+  const rsvpMutation = useMutation({
+    mutationFn: async (eventId: number) => apiRequest("POST", `/api/events/${eventId}/rsvp`),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/events/rsvps"] });
+      toast({
+        title: data.status === "registered" ? "Successfully Registered!" : "RSVP Cancelled",
+        description: data.status === "registered" ? "You are now registered for this event." : "Your RSVP has been removed.",
+      });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Registration Failed",
+        description: err.message || "Failed to update RSVP status.",
+        variant: "destructive"
+      });
+    }
+  });
+
   const archiveMutation = useMutation({
     mutationFn: (id: number) => apiRequest("POST", `/api/events/${id}/archive`),
     onSuccess: () => {
@@ -41,14 +72,55 @@ export function UpcomingEvents() {
     },
   });
 
+  const handleShare = (event: Event) => {
+    const text = `Join us for "${event.title}" on ${new Date(event.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} at ${event.startTime || 'TBD'}. Location: ${event.location || 'TBD'}.`;
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copied details to clipboard",
+      description: "Event details are copied. Ready to share!",
+    });
+  };
+
+  const handleAddToCalendar = (event: Event) => {
+    const start = new Date(event.startDate);
+    const end = event.endDate ? new Date(event.endDate) : new Date(start.getTime() + 7200000); // default 2 hours
+    const formattedStart = start.toISOString().replace(/-|:|\.\d\d\d/g, "");
+    const formattedEnd = end.toISOString().replace(/-|:|\.\d\d\d/g, "");
+    
+    const icsContent = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "BEGIN:VEVENT",
+      `SUMMARY:${event.title}`,
+      `DESCRIPTION:${event.description || ''}`,
+      `DTSTART:${formattedStart}`,
+      `DTEND:${formattedEnd}`,
+      `LOCATION:${event.location || ''}`,
+      "END:VEVENT",
+      "END:VCALENDAR"
+    ].join("\n");
+    
+    const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${event.title.replace(/\s+/g, "_")}.ics`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast({
+      title: "Saved Calendar Event",
+      description: "Calendar download completed.",
+    });
+  };
+
   const upcomingEvents = events
     .filter(e => !e.isArchived && new Date(e.startDate) >= new Date(Date.now() - 86400000))
     .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-    .slice(0, 5);
+    .slice(0, 3); // show top 3 beautiful cards
 
   if (upcomingEvents.length === 0) {
     return (
-      <Card>
+      <Card className="border-primary/20 bg-gradient-to-br from-amber-50/20 to-white dark:to-background">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CalendarDays className="w-5 h-5 text-primary" />
@@ -58,9 +130,9 @@ export function UpcomingEvents() {
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
             <CalendarDays className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>No upcoming events</p>
+            <p>No upcoming events scheduled</p>
             <Button variant="outline" className="mt-3" onClick={() => navigate("/events")}>
-              Add Event
+              Create Event
             </Button>
           </div>
         </CardContent>
@@ -69,91 +141,143 @@ export function UpcomingEvents() {
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2">
-          <CalendarDays className="w-5 h-5 text-primary" />
-          Upcoming Events
-        </CardTitle>
-        <Button variant="ghost" size="sm" onClick={() => navigate("/events")} className="text-muted-foreground">
-          View All <ChevronRight className="w-4 h-4 ml-1" />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-bold flex items-center gap-2 text-foreground">
+          <CalendarDays className="w-5 h-5 text-primary animate-pulse" />
+          Spiritual Events & Celebrations
+        </h2>
+        <Button variant="ghost" size="sm" onClick={() => navigate("/events")} className="text-xs text-muted-foreground hover:text-primary">
+          View All Events <ChevronRight className="w-4 h-4 ml-0.5" />
         </Button>
-      </CardHeader>
-      <CardContent className="space-y-3">
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {upcomingEvents.map(event => {
           const isPast = new Date(event.startDate) < new Date();
           const days = daysUntil(event.startDate);
+          const isRegistered = myRsvps.some((r: any) => r.eventId === event.id);
+          const bgImg = event.imageUrl || EVENT_IMAGES[event.eventType] || EVENT_IMAGES.fallback;
 
           return (
-            <div key={event.id} className="flex gap-4 p-3 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/5 transition-all group">
-              {/* Event Image / Icon */}
-              <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-muted">
-                {event.imageUrl ? (
-                  <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
-                    <CalendarDays className="w-7 h-7 text-primary" />
-                  </div>
-                )}
-              </div>
-
-              {/* Details */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="font-semibold text-sm text-foreground break-words">{event.title}</h3>
-                    <Badge className={`text-xs mt-1 ${EVENT_TYPE_COLORS[event.eventType] || "bg-muted text-muted-foreground"}`}>
-                      {event.eventType}
-                    </Badge>
-                  </div>
-                  <div className={`text-xs font-medium whitespace-nowrap px-2 py-1 rounded-full ${
-                    days === "Today" ? "bg-red-100 text-red-700" :
-                    days === "Tomorrow" ? "bg-orange-100 text-orange-700" :
-                    "bg-blue-100 text-blue-700"
-                  }`}>
-                    {days}
-                  </div>
+            <Card key={event.id} className="overflow-hidden border-primary/10 hover:border-primary/30 shadow-sm hover:shadow-md transition-all flex flex-col group h-full">
+              {/* Event Image Banner */}
+              <div className="h-40 w-full relative overflow-hidden bg-muted">
+                <img 
+                  src={bgImg} 
+                  alt={event.title} 
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                
+                {/* Event Type Badge */}
+                <Badge className={`absolute top-3 left-3 capitalize border ${EVENT_TYPE_COLORS[event.eventType] || "bg-muted text-muted-foreground"}`}>
+                  {event.eventType}
+                </Badge>
+                
+                {/* Days Until overlay */}
+                <div className={`absolute top-3 right-3 text-xs font-bold px-2.5 py-1 rounded-full text-white shadow-sm ${
+                  days === "Today" ? "bg-red-600" :
+                  days === "Tomorrow" ? "bg-orange-500" :
+                  "bg-amber-500"
+                }`}>
+                  {days}
                 </div>
-                <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {new Date(event.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                    {event.startTime ? ` · ${event.startTime}` : ""}
-                  </span>
-                  {event.location && (
-                    <span className="flex items-center gap-1 break-words" title={event.location}>
-                      <MapPin className="w-3 h-3 flex-shrink-0" />
-                      {event.location}
-                    </span>
-                  )}
-                  {event.maxParticipants && (
-                    <span className="flex items-center gap-1">
-                      <Users className="w-3 h-3" />
-                      Max {event.maxParticipants}
-                    </span>
-                  )}
+
+                {/* Bottom title overlay for compact text space */}
+                <div className="absolute bottom-3 left-3 right-3 text-white">
+                  <h3 className="font-bold text-base truncate drop-shadow-md" title={event.title}>{event.title}</h3>
                 </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                {isPast && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-xs"
-                    onClick={() => archiveMutation.mutate(event.id)}
-                    disabled={archiveMutation.isPending}
-                  >
-                    <Archive className="w-3 h-3 mr-1" />
-                    Archive
-                  </Button>
-                )}
-              </div>
-            </div>
+              {/* Event Body */}
+              <CardContent className="p-4 flex-1 flex flex-col justify-between space-y-4">
+                <div className="space-y-2">
+                  {event.description && (
+                    <p className="text-xs text-muted-foreground line-clamp-2" title={event.description}>
+                      {event.description}
+                    </p>
+                  )}
+
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock className="w-3.5 h-3.5 text-primary/70 flex-shrink-0" />
+                      <span>
+                        {new Date(event.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                        {event.startTime ? ` · ${event.startTime}` : ""}
+                      </span>
+                    </div>
+
+                    {event.location && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <MapPin className="w-3.5 h-3.5 text-primary/70 flex-shrink-0" />
+                        <span className="truncate" title={event.location}>{event.location}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Interactive Options Footer */}
+                <div className="pt-3 border-t border-dashed flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-primary"
+                      onClick={() => handleShare(event)}
+                      title="Share Event"
+                    >
+                      <Share2 className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-primary"
+                      onClick={() => handleAddToCalendar(event)}
+                      title="Add to Calendar"
+                    >
+                      <CalendarPlus className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {isPast && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs border-destructive/20 text-destructive hover:bg-destructive/5"
+                        onClick={() => archiveMutation.mutate(event.id)}
+                        disabled={archiveMutation.isPending}
+                      >
+                        <Archive className="w-3.5 h-3.5 mr-1" /> Archive
+                      </Button>
+                    )}
+                    
+                    <Button
+                      size="sm"
+                      onClick={() => rsvpMutation.mutate(event.id)}
+                      disabled={rsvpMutation.isPending}
+                      className={`h-8 text-xs font-semibold px-3 transition-all ${
+                        isRegistered 
+                          ? "bg-green-600 hover:bg-green-700 text-white" 
+                          : "bg-gradient-to-r from-primary to-secondary text-white"
+                      }`}
+                    >
+                      {isRegistered ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 mr-1 animate-bounce" /> Registered
+                        </>
+                      ) : (
+                        "RSVP / Attend"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           );
         })}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

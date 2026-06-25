@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { AttendanceChart } from "@/components/Dashboard/AttendanceChart";
 import { Header } from "@/components/Layout/Header";
 import { LoadingSpinner } from "@/components/Common/LoadingSpinner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -192,6 +193,10 @@ export default function AttendancePage() {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        <div className="w-full">
+          <AttendanceChart />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

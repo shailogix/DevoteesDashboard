@@ -182,124 +182,178 @@ export default function VolunteeringPage() {
           <Card><CardContent className="pt-4 pb-3"><div className="flex items-center gap-3"><Activity className="w-8 h-8 text-purple-600" /><div><p className="text-2xl font-bold">{records.length}</p><p className="text-xs text-muted-foreground">Total Records</p></div></div></CardContent></Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <CardTitle className="flex items-center gap-2"><HandHeart className="w-5 h-5 text-primary" /> Volunteering Records ({filteredRecords.length})</CardTitle>
-              <div className="flex flex-wrap gap-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search volunteer, activity..."
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="pl-9 w-52"
-                  />
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-3">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <CardTitle className="flex items-center gap-2"><HandHeart className="w-5 h-5 text-primary" /> Volunteering Records ({filteredRecords.length})</CardTitle>
+                  <div className="flex flex-wrap gap-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search volunteer, activity..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        className="pl-9 w-52"
+                      />
+                    </div>
+                    <Select value={selectedActivity} onValueChange={setSelectedActivity}>
+                      <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Activities</SelectItem>
+                        {ACTIVITY_TYPES.map(a => <SelectItem key={a} value={a.toLowerCase()}>{a}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                      <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Time</SelectItem>
+                        <SelectItem value="current">This Month</SelectItem>
+                        <SelectItem value="last">Last Month</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={openAdd} className="bg-gradient-to-r from-primary to-secondary">
+                      <Plus className="w-4 h-4 mr-2" /> Log Activity
+                    </Button>
+                  </div>
                 </div>
-                <Select value={selectedActivity} onValueChange={setSelectedActivity}>
-                  <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Activities</SelectItem>
-                    {ACTIVITY_TYPES.map(a => <SelectItem key={a} value={a.toLowerCase()}>{a}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Time</SelectItem>
-                    <SelectItem value="current">This Month</SelectItem>
-                    <SelectItem value="last">Last Month</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button onClick={openAdd} className="bg-gradient-to-r from-primary to-secondary">
-                  <Plus className="w-4 h-4 mr-2" /> Log Activity
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {filteredRecords.length === 0 ? (
-              <div className="text-center py-12">
-                <HandHeart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No records found</h3>
-                <p className="text-muted-foreground mb-4">No volunteering records match your filters.</p>
-                <Button onClick={openAdd}><Plus className="w-4 h-4 mr-2" /> Log First Activity</Button>
-              </div>
-            ) : (
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Volunteer</TableHead>
-                      <TableHead>Activity</TableHead>
-                      <TableHead>Hours</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredRecords.map((r: VolRecord) => (
-                      <TableRow key={r.id} className="hover:bg-muted/30">
-                        <TableCell>
-                          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate(`/devotees/${r.devoteeId}`)}>
+              </CardHeader>
+              <CardContent>
+                {filteredRecords.length === 0 ? (
+                  <div className="text-center py-12">
+                    <HandHeart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No records found</h3>
+                    <p className="text-muted-foreground mb-4">No volunteering records match your filters.</p>
+                    <Button onClick={openAdd}><Plus className="w-4 h-4 mr-2" /> Log First Activity</Button>
+                  </div>
+                ) : (
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Volunteer</TableHead>
+                          <TableHead>Activity</TableHead>
+                          <TableHead>Hours</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Location</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredRecords.map((r: VolRecord) => (
+                          <TableRow key={r.id} className="hover:bg-muted/30">
+                            <TableCell>
+                              <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate(`/devotees/${r.devoteeId}`)}>
+                                <Avatar className="w-8 h-8">
+                                  <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-secondary/20 font-semibold text-primary">{getDevoteeInitials(r.devoteeId)}</AvatarFallback>
+                                </Avatar>
+                                <span className="font-medium text-sm hover:text-primary transition-colors">{getDevoteeName(r.devoteeId)}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={ACTIVITY_COLORS[r.activityType] || "bg-gray-100 text-gray-800"}>{r.activityType}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span className="font-medium">{r.hoursCompleted || r.hoursCommitted || 0}h</span>
+                                {r.hoursCommitted && r.hoursCompleted !== null && r.hoursCompleted !== r.hoursCommitted && (
+                                  <span className="text-xs text-muted-foreground">/ {r.hoursCommitted}h committed</span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1 text-sm">
+                                <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                                {new Date(r.startDate).toLocaleDateString('en-IN')}
+                              </div>
+                            </TableCell>
+                            <TableCell><span className="text-sm">{r.location || "—"}</span></TableCell>
+                            <TableCell>
+                              <Badge variant={r.status === "completed" ? "default" : r.status === "active" ? "secondary" : "outline"} className="capitalize">{r.status}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button variant="ghost" size="sm" onClick={() => openEdit(r)}><Edit className="w-4 h-4" /></Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Record</AlertDialogTitle>
+                                      <AlertDialogDescription>Delete this volunteering record for {getDevoteeName(r.devoteeId)}?</AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => deleteMutation.mutate(r.id)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="lg:col-span-1">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Award className="w-4 h-4 text-amber-500" /> Top Volunteers
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {records.length === 0 ? (
+                  <div className="text-center py-6 text-muted-foreground text-xs">No records yet</div>
+                ) : (
+                  (() => {
+                    const volunteerSums: Record<number, number> = {};
+                    records.forEach(r => {
+                      const hrs = r.hoursCompleted || r.hoursCommitted || 0;
+                      volunteerSums[r.devoteeId] = (volunteerSums[r.devoteeId] || 0) + hrs;
+                    });
+                    
+                    return Object.entries(volunteerSums)
+                      .map(([devoteeId, hours]) => ({ devoteeId: parseInt(devoteeId), hours }))
+                      .sort((a, b) => b.hours - a.hours)
+                      .slice(0, 6)
+                      .map(({ devoteeId, hours }) => {
+                        const name = getDevoteeName(devoteeId);
+                        const initials = getDevoteeInitials(devoteeId);
+                        return (
+                          <div
+                            key={devoteeId}
+                            onClick={() => navigate(`/devotees/${devoteeId}`)}
+                            className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 text-left transition-colors cursor-pointer"
+                          >
                             <Avatar className="w-8 h-8">
-                              <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-secondary/20 font-semibold text-primary">{getDevoteeInitials(r.devoteeId)}</AvatarFallback>
+                              <AvatarFallback className="text-xs bg-purple-100 text-purple-700 font-semibold">
+                                {initials}
+                              </AvatarFallback>
                             </Avatar>
-                            <span className="font-medium text-sm hover:text-primary transition-colors">{getDevoteeName(r.devoteeId)}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-semibold truncate text-foreground">{name}</div>
+                              <div className="text-[10px] text-muted-foreground">Active Volunteer</div>
+                            </div>
+                            <Badge variant="secondary" className="text-xs">{hours}h</Badge>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={ACTIVITY_COLORS[r.activityType] || "bg-gray-100 text-gray-800"}>{r.activityType}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                            <span className="font-medium">{r.hoursCompleted || r.hoursCommitted || 0}h</span>
-                            {r.hoursCommitted && r.hoursCompleted !== null && r.hoursCompleted !== r.hoursCommitted && (
-                              <span className="text-xs text-muted-foreground">/ {r.hoursCommitted}h committed</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1 text-sm">
-                            <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                            {new Date(r.startDate).toLocaleDateString('en-IN')}
-                          </div>
-                        </TableCell>
-                        <TableCell><span className="text-sm">{r.location || "—"}</span></TableCell>
-                        <TableCell>
-                          <Badge variant={r.status === "completed" ? "default" : r.status === "active" ? "secondary" : "outline"} className="capitalize">{r.status}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => openEdit(r)}><Edit className="w-4 h-4" /></Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Record</AlertDialogTitle>
-                                  <AlertDialogDescription>Delete this volunteering record for {getDevoteeName(r.devoteeId)}?</AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => deleteMutation.mutate(r.id)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                        );
+                      });
+                  })()
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </main>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>

@@ -20,7 +20,8 @@ import {
   importRecords, 
   loginCodes, 
   devoteeDashboardWidgets,
-  dispatchLogs
+  dispatchLogs,
+  eventParticipation
 } from "@shared/schema";
 import { eq, and, desc, ne, sql } from "drizzle-orm";
 import { devConfig } from "./devConfig";
@@ -436,6 +437,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ archived: count });
     } catch (error) {
       res.status(500).json({ message: "Failed to auto-archive events" });
+    }
+  });
+
+  app.post('/api/events/:id/rsvp', isAuthenticated, async (req: any, res) => {
+    try {
+      const eventId = parseInt(req.params.id);
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      const devoteesList = await storage.getDevotees();
+      const devotee = devoteesList.find(d => d.userId === user.id);
+      if (!devotee) {
+        return res.status(400).json({ message: "No devotee profile linked to this user account." });
+      }
+
+      const existing = await db.select().from(eventParticipation)
+        .where(and(eq(eventParticipation.eventId, eventId), eq(eventParticipation.devoteeId, devotee.id)))
+        .limit(1);
+
+      if (existing.length > 0) {
+        await db.delete(eventParticipation)
+          .where(eq(eventParticipation.id, existing[0].id));
+        res.json({ status: "unregistered" });
+      } else {
+        await db.insert(eventParticipation).values({
+          eventId,
+          devoteeId: devotee.id,
+          status: "registered",
+          registrationDate: new Date()
+        });
+        res.json({ status: "registered" });
+      }
+    } catch (error) {
+      console.error("Error in event RSVP:", error);
+      res.status(500).json({ message: "Failed to update RSVP" });
+    }
+  });
+
+  app.get('/api/events/rsvps', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      const devoteesList = await storage.getDevotees();
+      const devotee = devoteesList.find(d => d.userId === user.id);
+      if (!devotee) return res.json([]);
+
+      const rsvps = await db.select().from(eventParticipation)
+        .where(eq(eventParticipation.devoteeId, devotee.id));
+      res.json(rsvps);
+    } catch (error) {
+      console.error("Error fetching RSVPs:", error);
+      res.status(500).json({ message: "Failed to fetch RSVPs" });
     }
   });
 

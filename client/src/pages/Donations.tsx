@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/Layout/Header";
 import { LoadingSpinner } from "@/components/Common/LoadingSpinner";
@@ -133,6 +134,59 @@ export default function Donations() {
   }).reduce((s: number, d: Donation) => s + parseFloat(d.amount || "0"), 0);
   const pendingCount = donations.filter((d: Donation) => d.status === "pending").length;
 
+  const COLORS = ["#D97706", "#F59E0B", "#FBBF24", "#FDE68A", "#B45309", "#78350F"];
+
+  const analyticsData = useMemo(() => {
+    const monthlyMap: Record<string, number> = {};
+    const monthsOrder: string[] = [];
+    const now = new Date();
+    
+    // Past 6 months
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label = d.toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+      monthlyMap[label] = 0;
+      monthsOrder.push(label);
+    }
+
+    const purposeMap: Record<string, number> = {};
+    const paymentMap: Record<string, number> = {};
+
+    donations.forEach((d: Donation) => {
+      if (d.status !== "received") return;
+      const amt = parseFloat(d.amount || "0");
+      const date = new Date(d.donationDate);
+      
+      const label = date.toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+      if (label in monthlyMap) {
+        monthlyMap[label] += amt;
+      }
+      
+      const purpose = d.purpose || "General";
+      purposeMap[purpose] = (purposeMap[purpose] || 0) + amt;
+
+      const method = d.paymentMethod || d.donationType || "other";
+      paymentMap[method] = (paymentMap[method] || 0) + amt;
+    });
+
+    const monthlyTrends = monthsOrder.map(month => ({
+      month,
+      amount: monthlyMap[month]
+    }));
+
+    const purposeBreakdown = Object.entries(purposeMap).map(([name, value]) => ({
+      name,
+      value
+    })).sort((a, b) => b.value - a.value);
+
+    const paymentBreakdown = Object.entries(paymentMap).map(([name, value]) => ({
+      name: name.toUpperCase(),
+      value
+    }));
+
+    return { monthlyTrends, purposeBreakdown, paymentBreakdown };
+  }, [donations]);
+
   const openAdd = () => {
     setEditDonation(null);
     setFormData({ devoteeId: "", amount: "", currency: "INR", donationType: "cash", purpose: "", donationDate: new Date().toISOString().slice(0, 10), paymentMethod: "cash", transactionId: "", receiptNumber: "", taxDeductible: false, anonymousDonation: false, notes: "", status: "received" });
@@ -181,6 +235,83 @@ export default function Donations() {
           <Card><CardContent className="pt-4 pb-3"><div className="flex items-center gap-3"><Heart className="w-8 h-8 text-red-500" /><div><p className="text-2xl font-bold">₹{monthlyDonations.toLocaleString('en-IN')}</p><p className="text-xs text-muted-foreground">This Month</p></div></div></CardContent></Card>
           <Card><CardContent className="pt-4 pb-3"><div className="flex items-center gap-3"><Gift className="w-8 h-8 text-blue-500" /><div><p className="text-2xl font-bold">{donations.length}</p><p className="text-xs text-muted-foreground">Total Records</p></div></div></CardContent></Card>
           <Card><CardContent className="pt-4 pb-3"><div className="flex items-center gap-3"><Clock className="w-8 h-8 text-yellow-500" /><div><p className="text-2xl font-bold">{pendingCount}</p><p className="text-xs text-muted-foreground">Pending</p></div></div></CardContent></Card>
+        </div>
+
+        {/* Donations Analytics Dashboard */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="lg:col-span-2 border-primary/20 bg-gradient-to-br from-amber-50/50 to-white dark:from-amber-950/10 dark:to-background">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-amber-800 dark:text-amber-300">
+                <TrendingUp className="w-4 h-4" /> Monthly Donation Trends (Received)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={analyticsData.monthlyTrends}>
+                    <defs>
+                      <linearGradient id="donationGlow" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                    <XAxis dataKey="month" stroke="currentColor" fontSize={11} opacity={0.7} />
+                    <YAxis stroke="currentColor" fontSize={11} opacity={0.7} tickFormatter={(v: any) => `₹${v}`} />
+                    <Tooltip formatter={(v: any) => [`₹${v.toLocaleString('en-IN')}`, "Amount"]} />
+                    <Area type="monotone" dataKey="amount" stroke="#D97706" strokeWidth={3} fillOpacity={1} fill="url(#donationGlow)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-primary/20 bg-gradient-to-br from-amber-50/50 to-white dark:from-amber-950/10 dark:to-background">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-amber-800 dark:text-amber-300">
+                <Heart className="w-4 h-4" /> Purpose Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col justify-center items-center h-[256px]">
+              {analyticsData.purposeBreakdown.length === 0 ? (
+                <div className="text-muted-foreground text-sm py-12">No data available</div>
+              ) : (
+                <>
+                  <div className="h-40 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={analyticsData.purposeBreakdown}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={45}
+                          outerRadius={65}
+                          paddingAngle={3}
+                          dataKey="value"
+                        >
+                          {analyticsData.purposeBreakdown.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(v: any) => [`₹${v.toLocaleString('en-IN')}`, "Total"]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="w-full space-y-1 mt-2 text-xs overflow-y-auto max-h-[80px] px-1">
+                    {analyticsData.purposeBreakdown.slice(0, 4).map((item, idx) => (
+                      <div key={item.name} className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 truncate">
+                          <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
+                          <span className="truncate max-w-[130px]" title={item.name}>{item.name}</span>
+                        </span>
+                        <span className="font-semibold text-muted-foreground">₹{item.value.toLocaleString('en-IN')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

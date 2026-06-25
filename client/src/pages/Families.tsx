@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/Layout/Header";
 import { LoadingSpinner } from "@/components/Common/LoadingSpinner";
@@ -33,6 +33,20 @@ export default function Families() {
 
   const { data: families = [], isLoading } = useQuery<Family[]>({ queryKey: ["/api/families"] });
   const { data: devotees = [] } = useQuery<Devotee[]>({ queryKey: ["/api/devotees"] });
+  const { data: attendance = [] } = useQuery<any[]>({ queryKey: ["/api/attendance"] });
+
+  const activeFamiliesList = useMemo(() => {
+    return [...families]
+      .map((f: Family) => {
+        const fMembers = devotees.filter((d: Devotee) => d.familyId === f.id);
+        const fAttendance = fMembers.reduce((sum: number, d: Devotee) => {
+          return sum + attendance.filter((a: any) => a.devoteeId === d.id).length;
+        }, 0);
+        return { ...f, memberCount: fMembers.length, attendanceCount: fAttendance };
+      })
+      .sort((a, b) => b.attendanceCount - a.attendanceCount)
+      .slice(0, 3);
+  }, [families, devotees, attendance]);
 
   const getDevoteeName = (id: number | null | undefined) => {
     if (!id) return "Not assigned";
@@ -122,6 +136,37 @@ export default function Families() {
     <div className="flex-1 flex flex-col overflow-hidden">
       <Header title="Families" subtitle="Manage family information and relationships" />
       <main className="flex-1 overflow-y-auto p-6">
+        {/* Featured / Active Families */}
+        {activeFamiliesList.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Most Active Families</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {activeFamiliesList.map((f: any) => (
+                <Card 
+                  key={f.id} 
+                  className="cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all bg-gradient-to-br from-amber-50/20 to-white dark:to-background border-border/60"
+                  onClick={() => navigate(`/families/${f.id}`)}
+                >
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-base font-bold text-primary">
+                        {f.familyName?.[0]}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-sm truncate text-foreground">{f.familyName}</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">{f.memberCount} members registered</p>
+                      </div>
+                      <Badge variant="secondary" className="bg-amber-100/60 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300 font-semibold">
+                        {f.attendanceCount} Attendances
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between flex-wrap gap-3">

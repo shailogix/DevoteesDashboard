@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/Layout/Header";
 import { LoadingSpinner } from "@/components/Common/LoadingSpinner";
@@ -12,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Edit, Trash2, Users2, Users, MapPin, Calendar, MessageSquare } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Users2, Users, MapPin, Calendar, MessageSquare, Send, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Group, GroupEntry, Devotee } from "@shared/schema";
@@ -23,12 +24,42 @@ export default function Groups() {
   const [editGroup, setEditGroup] = useState<Group | null>(null);
   const [viewGroup, setViewGroup] = useState<Group | null>(null);
   const [formData, setFormData] = useState({ groupName: "", description: "", groupType: "satsang", capacity: "", location: "", meetingSchedule: "" });
+  const [bulkMessageGroup, setBulkMessageGroup] = useState<Group | null>(null);
+  const [bulkMessage, setBulkMessage] = useState("");
+  
+  const COLORS = ["#3B82F6", "#8B5CF6", "#10B981", "#F59E0B", "#EF4444"];
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: groups = [], isLoading } = useQuery<Group[]>({ queryKey: ["/api/groups"] });
   const { data: entries = [] } = useQuery<GroupEntry[]>({ queryKey: ["/api/group-entries"] });
   const { data: devotees = [] } = useQuery<Devotee[]>({ queryKey: ["/api/devotees"] });
+
+  const analyticsData = useMemo(() => {
+    const typeCounts: Record<string, number> = {};
+    groups.forEach(g => {
+      const type = g.groupType || "other";
+      typeCounts[type] = (typeCounts[type] || 0) + 1;
+    });
+    const typeDistribution = Object.entries(typeCounts).map(([name, value]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      value
+    }));
+
+    const groupCapacities = groups.slice(0, 5).map(g => {
+      const groupEntries = entries.filter(e => e.groupId === g.id);
+      return {
+        name: g.groupName.slice(0, 12),
+        members: groupEntries.length,
+        capacity: g.capacity || 20
+      };
+    });
+
+    const totalCapacity = groups.reduce((s, g) => s + (g.capacity || 0), 0);
+    const fillRate = totalCapacity ? Math.round((entries.length / totalCapacity) * 100) : 0;
+
+    return { typeDistribution, groupCapacities, fillRate };
+  }, [groups, entries]);
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => apiRequest("POST", "/api/groups", data),
@@ -97,6 +128,73 @@ export default function Groups() {
     <div className="flex-1 overflow-auto p-6">
       <Header title="Groups" subtitle="Manage spiritual groups and communities" />
 
+      {/* Analytics Dashboard */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 mt-4">
+        <Card className="bg-gradient-to-br from-primary/10 to-white dark:to-background border-primary/20">
+          <CardHeader className="py-3"><CardTitle className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Total Groups</CardTitle></CardHeader>
+          <CardContent className="py-0 pb-3"><p className="text-3xl font-extrabold">{groups.length}</p></CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-950/10 dark:to-background border-blue-100">
+          <CardHeader className="py-3"><CardTitle className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Total Members</CardTitle></CardHeader>
+          <CardContent className="py-0 pb-3"><p className="text-3xl font-extrabold">{entries.length}</p></CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-amber-50 to-white dark:from-amber-950/10 dark:to-background border-amber-100">
+          <CardHeader className="py-3"><CardTitle className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Capacity Fill Rate</CardTitle></CardHeader>
+          <CardContent className="py-0 pb-3"><p className="text-3xl font-extrabold">{analyticsData.fillRate}%</p></CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <Card className="border-border/60">
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold flex items-center gap-2"><TrendingUp className="w-4 h-4 text-primary" /> Group Type Distribution</CardTitle></CardHeader>
+          <CardContent className="flex justify-center items-center h-[200px]">
+            {analyticsData.typeDistribution.length === 0 ? (
+              <div className="text-muted-foreground text-xs py-10">No data</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={analyticsData.typeDistribution}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={60}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {analyticsData.typeDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend wrapperStyle={{ fontSize: '10px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/60">
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold flex items-center gap-2"><Users className="w-4 h-4 text-primary" /> Group Size vs Capacity</CardTitle></CardHeader>
+          <CardContent className="h-[200px]">
+            {analyticsData.groupCapacities.length === 0 ? (
+              <div className="text-muted-foreground text-xs py-10">No data</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={analyticsData.groupCapacities} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                  <XAxis dataKey="name" fontSize={10} stroke="currentColor" />
+                  <YAxis fontSize={10} stroke="currentColor" />
+                  <Tooltip />
+                  <Bar dataKey="members" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Active Members" />
+                  <Bar dataKey="capacity" fill="rgba(192, 192, 192, 0.4)" radius={[4, 4, 0, 0]} name="Max Capacity" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="flex items-center gap-4 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -140,9 +238,50 @@ export default function Groups() {
               </CardHeader>
               <CardContent className="space-y-2">
                 {group.description && <p className="text-sm text-muted-foreground line-clamp-2">{group.description}</p>}
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
                   {group.location && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{group.location}</span>}
                   {group.meetingSchedule && <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{group.meetingSchedule}</span>}
+                </div>
+
+                <div className="pt-3 border-t border-dashed flex items-center gap-1.5 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200/50 flex-1 text-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const link = (group as any).whatsappLink;
+                      if (link) window.open(link, '_blank');
+                      else window.open(`https://wa.me/?text=Join+${encodeURIComponent(group.groupName)}`, '_blank');
+                    }}
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 mr-1" /> WhatsApp
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200/50 flex-1 text-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const link = (group as any).telegramLink;
+                      if (link) window.open(link, '_blank');
+                      else window.open('https://t.me/', '_blank');
+                    }}
+                  >
+                    <Send className="w-3.5 h-3.5 mr-1" /> Telegram
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 flex-1 text-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setBulkMessageGroup(group);
+                      setBulkMessage("");
+                    }}
+                  >
+                    <Send className="w-3.5 h-3.5 mr-1" /> Message
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -215,6 +354,47 @@ export default function Groups() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+      {/* Bulk Message Dialog */}
+      <Dialog open={!!bulkMessageGroup} onOpenChange={() => setBulkMessageGroup(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-primary" />
+              Bulk Message — {bulkMessageGroup?.groupName}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Compose a message to send to all members of this group.
+            </p>
+            <div className="space-y-1.5">
+              <Label>Message</Label>
+              <textarea
+                className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+                placeholder="Type your message here..."
+                value={bulkMessage}
+                onChange={e => setBulkMessage(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setBulkMessageGroup(null)}>Cancel</Button>
+              <Button
+                onClick={() => {
+                  if (!bulkMessage.trim()) return;
+                  const encoded = encodeURIComponent(bulkMessage);
+                  window.open(`https://wa.me/?text=${encoded}`, '_blank');
+                  toast({ title: "Message Ready", description: "WhatsApp opened with your message. Send it to the group." });
+                  setBulkMessageGroup(null);
+                }}
+                disabled={!bulkMessage.trim()}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Send className="w-4 h-4 mr-2" /> Send via WhatsApp
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
