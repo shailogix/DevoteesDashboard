@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Heart, Plus, IndianRupee, CreditCard, Banknote, Gift, Edit, Trash2, CheckCircle, Clock, Search, Printer, X, Award, ShieldCheck } from "lucide-react";
+import { Heart, Plus, IndianRupee, CreditCard, Banknote, Gift, Edit, Trash2, CheckCircle, Clock, Search, Printer, X, Award, ShieldCheck, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
@@ -183,7 +183,9 @@ export default function Donations() {
           <Card><CardContent className="pt-4 pb-3"><div className="flex items-center gap-3"><Clock className="w-8 h-8 text-yellow-500" /><div><p className="text-2xl font-bold">{pendingCount}</p><p className="text-xs text-muted-foreground">Pending</p></div></div></CardContent></Card>
         </div>
 
-        <Card>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <Card>
           <CardHeader>
             <div className="flex items-center justify-between flex-wrap gap-3">
               <CardTitle className="flex items-center gap-2"><Heart className="w-5 h-5 text-primary" /> Donation Records ({filteredDonations.length})</CardTitle>
@@ -329,6 +331,70 @@ export default function Donations() {
             )}
           </CardContent>
         </Card>
+          </div>
+
+          <div className="lg:col-span-1">
+            {/* Top Donors */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-primary" /> Top Donors
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {donations.length === 0 ? (
+                  <div className="text-center py-6 text-muted-foreground text-sm">No donation records yet</div>
+                ) : (
+                  <div className="space-y-2">
+                    {(() => {
+                      const donorSums: Record<number, { amount: number; lastType: string; isAnonymous: boolean }> = {};
+                      donations.forEach((d: Donation) => {
+                        const amountVal = parseFloat(d.amount || "0");
+                        if (!d.devoteeId) return;
+                        if (!donorSums[d.devoteeId]) {
+                          donorSums[d.devoteeId] = { amount: 0, lastType: d.donationType, isAnonymous: d.anonymousDonation };
+                        }
+                        donorSums[d.devoteeId].amount += amountVal;
+                      });
+
+                      return Object.entries(donorSums)
+                        .map(([devoteeId, data]) => ({
+                          devoteeId: parseInt(devoteeId),
+                          amount: data.amount,
+                          donationType: data.lastType,
+                          anonymousDonation: data.isAnonymous
+                        }))
+                        .sort((a, b) => b.amount - a.amount)
+                        .slice(0, 5)
+                        .map((d: any) => {
+                          const dev = devotees.find((dv: Devotee) => dv.id === d.devoteeId);
+                          const devName = d.anonymousDonation || !dev ? "Anonymous" : `${dev.firstName} ${dev.lastName}`;
+                          const initials = d.anonymousDonation || !dev ? "?" : `${dev.firstName[0]}${dev.lastName[0]}`;
+                          return (
+                            <div
+                              key={d.devoteeId}
+                              className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                            >
+                              <Avatar className="w-8 h-8">
+                                <AvatarFallback className="text-xs bg-green-100 text-green-700 font-semibold">
+                                  {initials}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium truncate">{devName}</div>
+                                <div className="text-xs text-muted-foreground capitalize">{d.donationType}</div>
+                              </div>
+                              <div className="text-sm font-bold text-green-700 dark:text-green-400">₹{d.amount.toLocaleString("en-IN")}</div>
+                            </div>
+                          );
+                        });
+                    })()}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </main>
 
       {/* ── RECEIPT MODAL ─────────────────────────────────────────────── */}

@@ -82,7 +82,7 @@ export default function Dashboard() {
       
       <main className="flex-1 overflow-y-auto p-6 space-y-8">
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <StatsCard
             title="Total Devotees"
             value={stats?.totalDevotees?.toLocaleString() || "0"}
@@ -96,13 +96,6 @@ export default function Dashboard() {
             icon={Building}
             color="from-blue-500 to-blue-600"
             href="/families"
-          />
-          <StatsCard
-            title="Total Donations"
-            value={`₹${(stats?.totalDonations || 0).toLocaleString('en-IN')}`}
-            icon={Heart}
-            color="from-green-500 to-green-600"
-            href="/donations"
           />
           <StatsCard
             title="Avg. Attendance"
@@ -123,49 +116,7 @@ export default function Dashboard() {
         </div>
 
         {/* Interconnected Summary Widgets */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Top Donors */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <TrendingUp className="w-4 h-4" /> Top Donors
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {donations.length === 0 ? (
-                <div className="text-center py-6 text-muted-foreground text-sm">No donation records yet</div>
-              ) : (
-                <div className="space-y-2">
-                  {donations
-                    .sort((a: any, b: any) => parseFloat(b.amount || "0") - parseFloat(a.amount || "0"))
-                    .slice(0, 5)
-                    .map((d: any) => {
-                      const dev = devotees.find((dv: any) => dv.id === d.devoteeId);
-                      const devName = dev ? `${dev.firstName} ${dev.lastName}` : "Anonymous";
-                      return (
-                        <button
-                          key={d.id}
-                          onClick={() => d.devoteeId && navigate(`/devotees/${d.devoteeId}`)}
-                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 text-left transition-colors"
-                        >
-                          <Avatar className="w-8 h-8">
-                            <AvatarFallback className="text-xs bg-green-100 text-green-700">
-                              {devName.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">{devName}</div>
-                            <div className="text-xs text-muted-foreground">{d.donationType}</div>
-                          </div>
-                          <div className="text-sm font-bold text-green-600">₹{parseFloat(d.amount || "0").toLocaleString("en-IN")}</div>
-                        </button>
-                      );
-                    })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
+        <div className="grid grid-cols-1 gap-6">
           {/* Top Volunteers */}
           <Card>
             <CardHeader className="pb-2">
@@ -225,7 +176,6 @@ export default function Dashboard() {
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {cities.map((city: string) => {
                     const cDevs = devotees.filter((d: any) => d.city === city);
-                    const cDonations = cDevs.reduce((s: number, d: any) => s + donations.filter((dn: any) => dn.devoteeId === d.id).reduce((ss: number, dn: any) => ss + parseFloat(dn.amount || "0"), 0), 0);
                     const cAttendance = cDevs.reduce((s: number, d: any) => s + attendance.filter((a: any) => a.devoteeId === d.id).length, 0);
                     const cVolunteering = cDevs.reduce((s: number, d: any) => s + volunteering.filter((v: any) => v.devoteeId === d.id).reduce((ss: number, v: any) => ss + (v.hoursCompleted || v.hours || 0), 0), 0);
                     return (
@@ -235,7 +185,7 @@ export default function Dashboard() {
                         className="text-left p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all"
                       >
                         <div className="text-sm font-medium">{city}</div>
-                        <div className="text-xs text-muted-foreground mt-1">{cDevs.length} devotees · ₹{cDonations.toLocaleString("en-IN")}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{cDevs.length} devotees</div>
                         <div className="text-xs text-muted-foreground">{cAttendance} attendances · {cVolunteering}h seva</div>
                       </button>
                     );
@@ -260,7 +210,6 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {families.slice(0, 6).map((f: any) => {
                   const fMembers = devotees.filter((d: any) => d.familyId === f.id);
-                  const fDonations = fMembers.reduce((s: number, d: any) => s + donations.filter((dn: any) => dn.devoteeId === d.id).reduce((ss: number, dn: any) => ss + parseFloat(dn.amount || "0"), 0), 0);
                   const fAttendance = fMembers.reduce((s: number, d: any) => s + attendance.filter((a: any) => a.devoteeId === d.id).length, 0);
                   return (
                     <button
@@ -274,7 +223,7 @@ export default function Dashboard() {
                         </div>
                         <div className="font-medium text-sm truncate">{f.familyName}</div>
                       </div>
-                      <div className="text-xs text-muted-foreground mt-2">{fMembers.length} members · ₹{fDonations.toLocaleString("en-IN")} · {fAttendance} attendances</div>
+                      <div className="text-xs text-muted-foreground mt-2">{fMembers.length} members · {fAttendance} attendances</div>
                     </button>
                   );
                 })}
