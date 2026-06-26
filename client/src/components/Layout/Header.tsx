@@ -120,7 +120,7 @@ function NotifItem({
 }
 
 export function Header({ title, subtitle, actions }: HeaderProps) {
-  const { isSuperAdmin, isViewingAsDevotee } = useAuth();
+  const { isSuperAdmin, isViewingAsDevotee, isAdmin, isLeader } = useAuth();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const qc = useQueryClient();
@@ -207,7 +207,7 @@ export function Header({ title, subtitle, actions }: HeaderProps) {
           )}
 
           {/* Global Search */}
-          <GlobalSearch />
+          {(isAdmin || isLeader) && <GlobalSearch />}
 
           {/* Extra actions */}
           {actions}

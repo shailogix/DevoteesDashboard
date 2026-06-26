@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,9 +49,19 @@ interface DevoteeDoc {
 }
 
 export default function DevoteeProfilePage() {
-  const [match, params] = useRoute("/devotees/:id");
+  const [isMyProfileRoute] = useRoute("/devotees/my-profile");
+  const [isDevoteeRoute, devoteeParams] = useRoute("/devotees/:id");
   const [, navigate] = useLocation();
-  const id = params?.id ? parseInt(params.id) : null;
+  const { user, isAdmin, isLeader } = useAuth();
+
+  const { data: dashboardData } = useQuery<any>({
+    queryKey: ["/api/devotee/dashboard"],
+    enabled: isMyProfileRoute,
+  });
+
+  const id = isMyProfileRoute
+    ? (dashboardData?.devotee?.id || null)
+    : (devoteeParams?.id ? parseInt(devoteeParams.id) : null);
   const { toast } = useToast();
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -137,9 +148,15 @@ export default function DevoteeProfilePage() {
         <div className="text-center space-y-4">
           <AlertCircle className="w-16 h-16 text-muted-foreground mx-auto" />
           <p className="text-xl text-muted-foreground">Devotee not found</p>
-          <Button onClick={() => navigate("/devotees")}>
-            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Devotees
-          </Button>
+          {(isAdmin || isLeader) ? (
+            <Button onClick={() => navigate("/devotees")}>
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back to Devotees
+            </Button>
+          ) : (
+            <Button onClick={() => navigate("/families/my-family")}>
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back to My Family
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -212,9 +229,15 @@ export default function DevoteeProfilePage() {
       <main className="flex-1 overflow-y-auto p-6 space-y-6">
 
         {/* Back Button */}
-        <Button variant="ghost" onClick={() => navigate("/devotees")} className="mb-2">
-          <ArrowLeft className="w-4 h-4 mr-2" /> Back to Devotees
-        </Button>
+        {(isAdmin || isLeader) ? (
+          <Button variant="ghost" onClick={() => navigate("/devotees")} className="mb-2">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Devotees
+          </Button>
+        ) : (
+          <Button variant="ghost" onClick={() => navigate("/families/my-family")} className="mb-2">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back to My Family
+          </Button>
+        )}
 
         {/* ── HERO SECTION ────────────────────────────────────────────── */}
         <div className="flex flex-col items-center gap-6">
@@ -645,32 +668,33 @@ export default function DevoteeProfilePage() {
           {/* ── DOCUMENTS TAB ───────────────────────────────────────────── */}
           <TabsContent value="documents" className="mt-6 space-y-6">
             {/* Upload panel — admin/dev mode only */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Upload className="w-4 h-4" /> Upload Document
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-3 items-end">
-                  <div className="space-y-1.5">
-                    <p className="text-xs text-muted-foreground">Document Type</p>
-                    <Select value={docType} onValueChange={setDocType}>
-                      <SelectTrigger className="w-48">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Aadhaar Card">Aadhaar Card</SelectItem>
-                        <SelectItem value="PAN Card">PAN Card</SelectItem>
-                        <SelectItem value="Passport">Passport</SelectItem>
-                        <SelectItem value="Voter ID">Voter ID</SelectItem>
-                        <SelectItem value="Driving Licence">Driving Licence</SelectItem>
-                        <SelectItem value="Photo">Photo</SelectItem>
-                        <SelectItem value="Certificate">Certificate</SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+            {(isAdmin || isLeader) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Upload className="w-4 h-4" /> Upload Document
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-3 items-end">
+                    <div className="space-y-1.5">
+                      <p className="text-xs text-muted-foreground">Document Type</p>
+                      <Select value={docType} onValueChange={setDocType}>
+                        <SelectTrigger className="w-48">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Aadhaar Card">Aadhaar Card</SelectItem>
+                          <SelectItem value="PAN Card">PAN Card</SelectItem>
+                          <SelectItem value="Passport">Passport</SelectItem>
+                          <SelectItem value="Voter ID">Voter ID</SelectItem>
+                          <SelectItem value="Driving Licence">Driving Licence</SelectItem>
+                          <SelectItem value="Photo">Photo</SelectItem>
+                          <SelectItem value="Certificate">Certificate</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -690,6 +714,7 @@ export default function DevoteeProfilePage() {
                   </div>
                 </CardContent>
               </Card>
+            )}
 
             {/* Document list */}
             <Card>
@@ -738,15 +763,17 @@ export default function DevoteeProfilePage() {
                           >
                             <Download className="w-4 h-4 text-blue-600" />
                           </Button>
-                          <Button
-                            variant="ghost" size="sm"
-                            onClick={() => deleteDocMutation.mutate(doc.id)}
-                            disabled={deleteDocMutation.isPending}
-                            className="text-destructive hover:text-destructive"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {(isAdmin || isLeader) && (
+                            <Button
+                              variant="ghost" size="sm"
+                              onClick={() => deleteDocMutation.mutate(doc.id)}
+                              disabled={deleteDocMutation.isPending}
+                              className="text-destructive hover:text-destructive"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}

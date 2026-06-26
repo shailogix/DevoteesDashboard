@@ -19,6 +19,7 @@ import { Heart, Plus, IndianRupee, CreditCard, Banknote, Gift, Edit, Trash2, Che
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
 import type { Devotee } from "@shared/schema";
 
 interface Donation {
@@ -72,8 +73,21 @@ export default function Donations() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
 
+  const { user, isAdmin, isLeader } = useAuth();
+
   const { data: donations = [], isLoading } = useQuery<Donation[]>({ queryKey: ["/api/donations"] });
-  const { data: devotees = [] } = useQuery<Devotee[]>({ queryKey: ["/api/devotees"] });
+  const { data: devoteeDashboard } = useQuery<any>({ queryKey: ["/api/devotee/dashboard"], enabled: !isAdmin && !isLeader });
+  const { data: devoteesRaw = [] } = useQuery<Devotee[]>({ queryKey: ["/api/devotees"], enabled: isAdmin || isLeader });
+
+  const devotees = useMemo(() => {
+    if (isAdmin || isLeader) return devoteesRaw;
+    if (!devoteeDashboard) return [];
+    const list = [devoteeDashboard.devotee];
+    if (devoteeDashboard.familyMembers) {
+      list.push(...devoteeDashboard.familyMembers.filter((m: any) => m.id !== devoteeDashboard.devotee.id));
+    }
+    return list;
+  }, [isAdmin, isLeader, devoteesRaw, devoteeDashboard]);
 
   const getDevoteeName = (id: number) => {
     const d = devotees.find((dv: Devotee) => dv.id === id);
@@ -189,7 +203,21 @@ export default function Donations() {
 
   const openAdd = () => {
     setEditDonation(null);
-    setFormData({ devoteeId: "", amount: "", currency: "INR", donationType: "cash", purpose: "", donationDate: new Date().toISOString().slice(0, 10), paymentMethod: "cash", transactionId: "", receiptNumber: "", taxDeductible: false, anonymousDonation: false, notes: "", status: "received" });
+    setFormData({
+      devoteeId: !isAdmin && !isLeader && devoteeDashboard?.devotee ? String(devoteeDashboard.devotee.id) : "",
+      amount: "",
+      currency: "INR",
+      donationType: !isAdmin && !isLeader ? "online" : "cash",
+      purpose: "",
+      donationDate: new Date().toISOString().slice(0, 10),
+      paymentMethod: !isAdmin && !isLeader ? "upi" : "cash",
+      transactionId: "",
+      receiptNumber: "",
+      taxDeductible: false,
+      anonymousDonation: false,
+      notes: "",
+      status: !isAdmin && !isLeader ? "pending" : "received"
+    });
     setIsFormOpen(true);
   };
 
@@ -433,25 +461,29 @@ export default function Donations() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => openEdit(d)} title="Edit"><Edit className="w-4 h-4" /></Button>
+                            {(isAdmin || isLeader) && (
+                              <Button variant="ghost" size="sm" onClick={() => openEdit(d)} title="Edit"><Edit className="w-4 h-4" /></Button>
+                            )}
                             <Button variant="ghost" size="sm" onClick={() => setReceiptDonation(d)} title="Print Receipt" className="text-blue-600 hover:text-blue-700">
                               <Printer className="w-4 h-4" />
                             </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Donation Record</AlertDialogTitle>
-                                  <AlertDialogDescription>Delete donation of ₹{parseFloat(d.amount).toLocaleString('en-IN')} from {d.anonymousDonation ? "Anonymous" : getDevoteeName(d.devoteeId)}? This cannot be undone.</AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => deleteMutation.mutate(d.id)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                            {(isAdmin || isLeader) && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Donation Record</AlertDialogTitle>
+                                    <AlertDialogDescription>Delete donation of ₹{parseFloat(d.amount).toLocaleString('en-IN')} from {d.anonymousDonation ? "Anonymous" : getDevoteeName(d.devoteeId)}? This cannot be undone.</AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => deleteMutation.mutate(d.id)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -874,26 +906,30 @@ export default function Donations() {
               <Input value={formData.purpose} onChange={e => setFormData({...formData, purpose: e.target.value})} placeholder="e.g. Temple renovation, Festival celebrations" />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
+              <div className={isAdmin || isLeader ? "space-y-1.5" : "space-y-1.5 col-span-2"}>
                 <Label>Transaction ID</Label>
                 <Input value={formData.transactionId} onChange={e => setFormData({...formData, transactionId: e.target.value})} placeholder="UPI/bank reference" />
               </div>
+              {(isAdmin || isLeader) && (
+                <div className="space-y-1.5">
+                  <Label>Receipt Number</Label>
+                  <Input value={formData.receiptNumber} onChange={e => setFormData({...formData, receiptNumber: e.target.value})} placeholder="Auto-generated if blank" />
+                </div>
+              )}
+            </div>
+            {(isAdmin || isLeader) && (
               <div className="space-y-1.5">
-                <Label>Receipt Number</Label>
-                <Input value={formData.receiptNumber} onChange={e => setFormData({...formData, receiptNumber: e.target.value})} placeholder="Auto-generated if blank" />
+                <Label>Status</Label>
+                <Select value={formData.status} onValueChange={v => setFormData({...formData, status: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="received">Received</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Status</Label>
-              <Select value={formData.status} onValueChange={v => setFormData({...formData, status: v})}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="received">Received</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            )}
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Switch checked={formData.taxDeductible} onCheckedChange={v => setFormData({...formData, taxDeductible: v})} />

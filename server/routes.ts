@@ -7,6 +7,7 @@ import { db } from "./db";
 import { 
   users, 
   devotees, 
+  mentors,
   events, 
   devoteePendingUpdates, 
   polls, 
@@ -85,6 +86,32 @@ import { z } from "zod";
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware - Replit Auth
   await setupAuth(app);
+
+  const checkDevoteeAccess = async (req: any, devoteeId: number): Promise<boolean> => {
+    const userId = req.user?.claims?.sub;
+    if (!userId) return false;
+    const dbUser = await storage.getUser(userId);
+    if (!dbUser) return false;
+    
+    // Admins and leaders have full access
+    const hasPrivilege = dbUser.role === "super-admin" || dbUser.role === "admin" || dbUser.role === "leader";
+    if (hasPrivilege) return true;
+
+    // Normal devotees can only access themselves and family
+    const [ownDevotee] = await db.select().from(devotees).where(eq(devotees.userId, userId));
+    if (!ownDevotee) return false;
+
+    if (ownDevotee.id === devoteeId) return true;
+
+    if (ownDevotee.familyId) {
+      const [targetDevotee] = await db.select().from(devotees).where(eq(devotees.id, devoteeId));
+      if (targetDevotee && targetDevotee.familyId === ownDevotee.familyId) {
+        return true;
+      }
+    }
+
+    return false;
+  };
 
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
@@ -172,9 +199,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/devotees/:id', isAuthenticated, requireLeader, async (req, res) => {
+  app.get('/api/devotees/:id', isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+      const hasAccess = await checkDevoteeAccess(req, id);
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
       const devotee = await storage.getDevotee(id);
       if (!devotee) {
         return res.status(404).json({ message: "Devotee not found" });
@@ -232,9 +263,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!devotee) {
         return res.status(404).json({ message: "Devotee not found" });
       }
-      const isLeader = req.user?.isLeader;
-      const currentUserId = req.user?.claims?.sub;
-      if (!isLeader && devotee.userId !== currentUserId) {
+      const hasAccess = await checkDevoteeAccess(req, id);
+      if (!hasAccess) {
         return res.status(403).json({ message: "Forbidden" });
       }
       if (!devotee.familyId) return res.json([]);
@@ -253,9 +283,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!devotee) {
         return res.status(404).json({ message: "Devotee not found" });
       }
-      const isLeader = req.user?.isLeader;
-      const currentUserId = req.user?.claims?.sub;
-      if (!isLeader && devotee.userId !== currentUserId) {
+      const hasAccess = await checkDevoteeAccess(req, id);
+      if (!hasAccess) {
         return res.status(403).json({ message: "Forbidden" });
       }
       const [attendance, donations, volunteering] = await Promise.all([
@@ -277,9 +306,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!devotee) {
         return res.status(404).json({ message: "Devotee not found" });
       }
-      const isLeader = req.user?.isLeader;
-      const currentUserId = req.user?.claims?.sub;
-      if (!isLeader && devotee.userId !== currentUserId) {
+      const hasAccess = await checkDevoteeAccess(req, id);
+      if (!hasAccess) {
         return res.status(403).json({ message: "Forbidden" });
       }
       const memberships = await storage.getGroupMemberships(id);
@@ -302,9 +330,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!devotee) {
         return res.status(404).json({ message: "Devotee not found" });
       }
-      const isLeader = req.user?.isLeader;
-      const currentUserId = req.user?.claims?.sub;
-      if (!isLeader && devotee.userId !== currentUserId) {
+      const hasAccess = await checkDevoteeAccess(req, id);
+      if (!hasAccess) {
         return res.status(403).json({ message: "Forbidden" });
       }
       const allMandals = await storage.getMandals();
@@ -386,24 +413,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Donation routes
-  app.get('/api/donations', isAuthenticated, requireAdmin, async (req, res) => {
+  app.get('/api/donations', isAuthenticated, async (req: any, res) => {
     try {
-      const devoteeId = req.query.devoteeId ? parseInt(req.query.devoteeId as string) : undefined;
-      const donations = await storage.getDonations(devoteeId);
-      res.json(donations);
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const dbUser = await storage.getUser(userId);
+      if (!dbUser) return res.status(401).json({ message: "Unauthorized" });
+
+      const isAdmin = dbUser.role === "admin" || dbUser.role === "super-admin";
+      
+      if (isAdmin) {
+        const devoteeId = req.query.devoteeId ? parseInt(req.query.devoteeId as string) : undefined;
+        const donations = await storage.getDonations(devoteeId);
+        return res.json(donations);
+      } else {
+        // Normal devotee: fetch their own profile and family members
+        const [ownDevotee] = await db.select().from(devotees).where(eq(devotees.userId, userId));
+        if (!ownDevotee) {
+          return res.json([]);
+        }
+
+        let allowedDevoteeIds = [ownDevotee.id];
+        if (ownDevotee.familyId) {
+          const familyMembers = await db.select().from(devotees).where(eq(devotees.familyId, ownDevotee.familyId));
+          allowedDevoteeIds = familyMembers.map(m => m.id);
+        }
+
+        const devoteeId = req.query.devoteeId ? parseInt(req.query.devoteeId as string) : undefined;
+        if (devoteeId !== undefined) {
+          if (!allowedDevoteeIds.includes(devoteeId)) {
+            return res.status(403).json({ message: "Forbidden" });
+          }
+          const donations = await storage.getDonations(devoteeId);
+          return res.json(donations);
+        }
+
+        const allDonations = await storage.getDonations();
+        const filtered = allDonations.filter(d => allowedDevoteeIds.includes(d.devoteeId));
+        return res.json(filtered);
+      }
     } catch (error) {
       console.error("Error fetching donations:", error);
       res.status(500).json({ message: "Failed to fetch donations" });
     }
   });
 
-  app.post('/api/donations', isAuthenticated, requireAdmin, async (req: any, res) => {
+  app.post('/api/donations', isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertDonationSchema.parse({
-        ...req.body,
-        recordedBy: req.user.claims.sub,
-      });
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const dbUser = await storage.getUser(userId);
+      if (!dbUser) return res.status(401).json({ message: "Unauthorized" });
+
+      const isAdmin = dbUser.role === "admin" || dbUser.role === "super-admin";
+      const body = { ...req.body };
+
+      if (!isAdmin) {
+        // Normal devotee can only record for themselves or family members
+        const [ownDevotee] = await db.select().from(devotees).where(eq(devotees.userId, userId));
+        if (!ownDevotee) {
+          return res.status(403).json({ message: "Forbidden" });
+        }
+        
+        let allowedDevoteeIds = [ownDevotee.id];
+        if (ownDevotee.familyId) {
+          const familyMembers = await db.select().from(devotees).where(eq(devotees.familyId, ownDevotee.familyId));
+          allowedDevoteeIds = familyMembers.map(m => m.id);
+        }
+        
+        const targetDevoteeId = parseInt(body.devoteeId);
+        if (!allowedDevoteeIds.includes(targetDevoteeId)) {
+          return res.status(403).json({ message: "Forbidden" });
+        }
+        
+        body.status = "pending";
+        body.recordedBy = userId;
+      } else {
+        body.recordedBy = userId;
+      }
+
+      const validatedData = insertDonationSchema.parse(body);
       const donation = await storage.createDonation(validatedData);
       res.status(201).json(donation);
     } catch (error) {
@@ -1064,7 +1153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Extended donation routes
-  app.put('/api/donations/:id', isAuthenticated, async (req, res) => {
+  app.put('/api/donations/:id', isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const donation = await storage.updateDonation(id, req.body);
@@ -1075,7 +1164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/donations/:id', isAuthenticated, async (req, res) => {
+  app.delete('/api/donations/:id', isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteDonation(id);
@@ -1215,9 +1304,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!devotee) {
         return res.status(404).json({ message: "Devotee not found" });
       }
-      const isLeader = req.user?.isLeader;
-      const currentUserId = req.user?.claims?.sub;
-      if (!isLeader && devotee.userId !== currentUserId) {
+      const hasAccess = await checkDevoteeAccess(req, id);
+      if (!hasAccess) {
         return res.status(403).json({ message: "Forbidden" });
       }
       const ms = (storage as any).memStore as MemoryStorage;
@@ -2306,7 +2394,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isMentor
       };
 
-      res.json({ devotee: dev, upcomingEvents, widgets, familyMembers, stats });
+      // Fetch Mentor details
+      let mentorDetails: any = null;
+      if (dev.mentorId) {
+        const [mentorRec] = await db.select().from(mentors).where(eq(mentors.id, dev.mentorId));
+        if (mentorRec) {
+          const [mentorDev] = await db.select().from(devotees).where(eq(devotees.id, mentorRec.devoteeId));
+          if (mentorDev) {
+            mentorDetails = {
+              name: `${mentorDev.firstName} ${mentorDev.lastName}`,
+              phone: mentorDev.phone || mentorDev.whatsappNumber || "",
+              whatsappNumber: mentorDev.whatsappNumber || "",
+              email: mentorDev.email || "",
+              specialization: mentorRec.specialization || "Spiritual Counseling"
+            };
+          }
+        }
+      }
+
+      res.json({ devotee: dev, upcomingEvents, widgets, familyMembers, stats, mentorDetails });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -2508,12 +2614,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/quizzes', isAuthenticated, async (req, res) => {
+  app.get('/api/quizzes', isAuthenticated, async (req: any, res) => {
+    const userId = req.user?.claims?.sub || "";
     try {
       const allQuizzes = await db.select().from(quizzes).orderBy(desc(quizzes.createdAt));
       const quizzesWithQuestions = await Promise.all(allQuizzes.map(async (q) => {
         const questions = await db.select().from(quizQuestions).where(eq(quizQuestions.quizId, q.id));
-        return { ...q, questions };
+        const [userResponse] = await db.select().from(quizResponses).where(
+          and(
+            eq(quizResponses.quizId, q.id),
+            eq(quizResponses.userId, userId)
+          )
+        );
+        return { ...q, questions, hasSubmitted: !!userResponse, userResponse };
       }));
       res.json(quizzesWithQuestions);
     } catch (err: any) {

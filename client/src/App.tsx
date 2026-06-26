@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -13,6 +13,8 @@ import { useDevMode } from "@/contexts/DevModeContext";
 import { DevModeProvider } from "@/contexts/DevModeContext";
 import { VisualEditorProvider, useVisualEditor } from "@/contexts/VisualEditorContext";
 import { GodModeEditorPanel } from "@/components/GodModeEditor/GodModeEditorPanel";
+import { Button } from "@/components/ui/button";
+import { AlertCircle, LogOut } from "lucide-react";
 
 // Pages
 import Dashboard from "@/pages/Dashboard";
@@ -42,6 +44,7 @@ import DevoteeDashboard from "@/pages/DevoteeDashboard";
 import ImportData from "@/pages/ImportData";
 import PollsQuizzes from "@/pages/PollsQuizzes";
 import Feedback from "@/pages/Feedback";
+import MyFamilyPage from "@/pages/MyFamilyPage";
 
 function EditModeCursor() {
   const { isEditMode } = useVisualEditor();
@@ -149,11 +152,6 @@ function LeaderRoute({ component: Component }: { component: React.ComponentType 
   return <Component />;
 }
 
-
-import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, LogOut } from 'lucide-react';
-import { Button } from "@/components/ui/button";
 
 function PendingApprovalScreen({ logout }: { logout: () => void }) {
   const [code, setCode] = useState("");
@@ -277,6 +275,18 @@ function PendingApprovalScreen({ logout }: { logout: () => void }) {
 function AppContent() {
   const { isAuthenticated, isLoading, isAdmin, isLeader, isSuperAdmin, isApproved, logout, isViewingAsDevotee } = useAuth();
   const { isDevMode } = useDevMode();
+  const [splashDismissed, setSplashDismissed] = useState(
+    typeof window !== 'undefined' ? sessionStorage.getItem("splash_dismissed") === "true" : false
+  );
+
+  const { data: dashboardData } = useQuery<any>({
+    queryKey: ["/api/devotee/dashboard"],
+    enabled: isAuthenticated && isApproved && !splashDismissed,
+  });
+
+  const devotee = dashboardData?.devotee;
+  const genderSuffix = devotee?.gender === "Female" ? "Maa Ji" : "Bhai Ji";
+  const showSplash = !splashDismissed && devotee;
 
   if (isLoading) {
     return (
@@ -321,11 +331,46 @@ function AppContent() {
           </button>
         </div>
       )}
+      {showSplash && (
+        <div 
+          onClick={() => {
+            sessionStorage.setItem("splash_dismissed", "true");
+            setSplashDismissed(true);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md animate-fade-in cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-md w-full mx-4 rounded-3xl border border-amber-400/30 bg-gradient-to-br from-amber-500/90 to-orange-600/90 p-8 text-center text-white shadow-2xl shadow-amber-500/25 backdrop-blur-lg animate-spring-pop space-y-6"
+          >
+            <div className="absolute inset-0 rounded-3xl bg-radial-gradient from-white/10 to-transparent pointer-events-none" />
+            <div className="relative space-y-4">
+              <div className="w-20 h-20 rounded-2xl bg-white/20 flex items-center justify-center mx-auto shadow-inner animate-pulse">
+                <span className="text-white text-4xl font-black font-serif">॥</span>
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-3xl font-black tracking-tight drop-shadow-md">
+                  Jai Shree Madhav 🙏🏻
+                </h2>
+                <div className="h-0.5 w-16 bg-white/30 mx-auto rounded-full" />
+                <p className="text-xl font-bold tracking-wide mt-3 drop-shadow-sm">
+                  {devotee.firstName} {devotee.lastName} {genderSuffix}..!!
+                </p>
+              </div>
+              <p className="text-xs opacity-80 font-medium">
+                Welcome to your devotional portal. Click anywhere to enter.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden">
           <Switch>
             <Route path="/" component={(isAdmin || isLeader) ? Dashboard : DevoteeDashboard} />
+            <Route path="/devotees/my-profile" component={DevoteeProfilePage} />
+            <Route path="/families/my-family" component={MyFamilyPage} />
             <Route path="/devotees">
               <LeaderRoute component={Devotees} />
             </Route>
@@ -338,9 +383,7 @@ function AppContent() {
             <Route path="/attendance">
               <LeaderRoute component={Attendance} />
             </Route>
-            <Route path="/donations">
-              <AdminRoute component={Donations} />
-            </Route>
+            <Route path="/donations" component={Donations} />
             <Route path="/events">
               <LeaderRoute component={Events} />
             </Route>
@@ -372,9 +415,7 @@ function AppContent() {
             <Route path="/dev-studio">
               <SuperAdminRoute component={DevStudio} />
             </Route>
-            <Route path="/devotees/:id">
-              <LeaderRoute component={DevoteeProfilePage} />
-            </Route>
+            <Route path="/devotees/:id" component={DevoteeProfilePage} />
             <Route path="/events/:id">
               <LeaderRoute component={EventDetailPage} />
             </Route>

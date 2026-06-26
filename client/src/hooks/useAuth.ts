@@ -21,6 +21,11 @@ export function useAuth() {
 
   const logout = async () => {
     try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem("view_as_role");
+        sessionStorage.removeItem("portal_choice_made");
+        sessionStorage.removeItem("splash_dismissed");
+      }
       await fetch("/api/logout", { method: "GET", credentials: "include" });
       window.location.href = "/";
     } catch (error) {
@@ -30,10 +35,11 @@ export function useAuth() {
   };
 
   const isSuperAdmin = user?.role === "super-admin";
-  const isViewingAsDevotee = isSuperAdmin && typeof window !== 'undefined' && localStorage.getItem("view_as_role") === "devotee";
+  const isActualAdmin = user?.role === "admin" || user?.role === "super-admin";
+  const isViewingAsDevotee = isActualAdmin && typeof window !== 'undefined' && localStorage.getItem("view_as_role") === "devotee";
   
-  const isAdmin = (user?.role === "admin" || user?.role === "super-admin") && !isViewingAsDevotee;
-  const isLeader = (user?.role === "leader" || user?.role === "admin" || user?.role === "super-admin") && !isViewingAsDevotee;
+  const isAdmin = isActualAdmin && !isViewingAsDevotee;
+  const isLeader = (user?.role === "leader" || isActualAdmin) && !isViewingAsDevotee;
   const isApproved = user?.approvalStatus === "approved" || isSuperAdmin;
   const hasRole = (role: string) => (user?.role === role || isSuperAdmin) && !isViewingAsDevotee;
 

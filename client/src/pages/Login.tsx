@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/Common/LoadingSpinner";
+import { Shield, User } from "lucide-react";
 
 const FEATURES = [
   { icon: "👨‍👩‍👧‍👦", text: "Devotee & family management" },
@@ -15,18 +16,101 @@ const FEATURES = [
 ];
 
 export default function Login() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, user, isLoading } = useAuth();
+  const isActualAdmin = user?.role === "admin" || user?.role === "super-admin";
+  const showPortalChoice = isAuthenticated && isActualAdmin && typeof window !== 'undefined' && sessionStorage.getItem("portal_choice_made") !== "true";
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && (!isActualAdmin || (typeof window !== 'undefined' && sessionStorage.getItem("portal_choice_made") === "true"))) {
       window.location.href = "/";
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isActualAdmin]);
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background particle-bg">
         <LoadingSpinner size="lg" text="Checking authentication..." />
+      </div>
+    );
+  }
+
+  if (showPortalChoice) {
+    return (
+      <div className="min-h-screen bg-background particle-bg flex items-center justify-center p-4">
+        {/* Ambient glows */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative w-full max-w-2xl animate-fade-in-up">
+          <div className="rounded-3xl border border-border/50 bg-[var(--surface-container-high,var(--card))] shadow-elevation-4 overflow-hidden">
+            <div className="h-1.5 bg-gradient-to-r from-amber-500 via-orange-400 to-yellow-400" />
+            <div className="p-8 space-y-8">
+              <div className="text-center space-y-3">
+                <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-elevation-3 mx-auto">
+                  <span className="text-white text-2xl font-black">॥</span>
+                </div>
+                <h1 className="text-3xl font-black text-foreground tracking-tight">Choose Your Portal View</h1>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                  As an administrator, you have access to both management dashboards. Select how you would like to proceed.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Admin Card */}
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("view_as_role");
+                    sessionStorage.setItem("portal_choice_made", "true");
+                    window.location.href = "/";
+                  }}
+                  className="group relative rounded-2xl border border-border/80 bg-muted/30 p-6 text-left hover:border-amber-500/50 hover:bg-amber-500/5 transition-all duration-300 flex flex-col justify-between h-56 shadow-sm hover:shadow-elevation-2"
+                >
+                  <div className="space-y-3">
+                    <div className="w-12 h-12 rounded-xl bg-amber-500/15 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Shield className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-base text-foreground group-hover:text-amber-700 dark:group-hover:text-amber-500 transition-colors">Admin Portal View</h3>
+                      <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                        Access the full database management dashboard, track all devotees, run attendance, record donations, view global analytics, and configure settings.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-amber-700 dark:text-amber-500 flex items-center gap-1 mt-4">
+                    Access Dashboard &rarr;
+                  </span>
+                </button>
+
+                {/* Devotee Card */}
+                <button
+                  onClick={() => {
+                    localStorage.setItem("view_as_role", "devotee");
+                    sessionStorage.setItem("portal_choice_made", "true");
+                    window.location.href = "/";
+                  }}
+                  className="group relative rounded-2xl border border-border/80 bg-muted/30 p-6 text-left hover:border-orange-500/50 hover:bg-orange-500/5 transition-all duration-300 flex flex-col justify-between h-56 shadow-sm hover:shadow-elevation-2"
+                >
+                  <div className="space-y-3">
+                    <div className="w-12 h-12 rounded-xl bg-orange-500/15 text-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <User className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-base text-foreground group-hover:text-orange-700 dark:group-hover:text-orange-500 transition-colors">Devotee Portal View</h3>
+                      <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                        View the portal as a standard devotee. Access your personal profile, check family connection records, answer quizzes, vote on polls, and view your donations.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-orange-700 dark:text-orange-500 flex items-center gap-1 mt-4">
+                    View My Portal &rarr;
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

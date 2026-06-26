@@ -177,7 +177,7 @@ function AddGroupDialog({
 
 export function Sidebar() {
   const [location] = useLocation();
-  const { user, isAdmin, isLeader, isSuperAdmin, canSeePage } = useAuth();
+  const { user, isAdmin, isLeader, isSuperAdmin, canSeePage, logout } = useAuth();
   const { isDevMode, showDevLogin, deactivateDevMode } = useDevMode();
   const [groupsOpen, setGroupsOpen] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
@@ -208,11 +208,26 @@ export function Sidebar() {
     logoSymbol: "॥",
   };
 
-  const rawNavItems: any[] = devConfig?.navigation?.items
+  let rawNavItems: any[] = devConfig?.navigation?.items
     ? [...devConfig.navigation.items]
         .sort((a: any, b: any) => a.order - b.order)
         .filter((n: any) => n.visible)
     : DEFAULT_NAVIGATION;
+
+  if (!isAdmin && !isLeader) {
+    rawNavItems = rawNavItems.map(item => {
+      if (item.id === "devotees") {
+        return { ...item, name: "My Profile", href: "/devotees/my-profile" };
+      }
+      if (item.id === "families") {
+        return { ...item, name: "My Family", href: "/families/my-family" };
+      }
+      if (item.id === "donations") {
+        return { ...item, name: "My Donations", href: "/donations" };
+      }
+      return item;
+    });
+  }
 
   const ADMIN_ONLY_PAGES = [
     "analytics", "id-cards", "devotees", "families", "mandals",
@@ -222,6 +237,9 @@ export function Sidebar() {
 
   const navItems = featureFlags
     ? rawNavItems.filter((item) => {
+        if (!isAdmin && !isLeader) {
+          return ["dashboard", "polls-quizzes", "feedback", "notifications", "devotees", "families", "donations"].includes(item.id);
+        }
         const flagKey = Object.entries(FLAG_TO_NAV_ID).find(
           ([, navId]) => navId === item.id
         )?.[0];
@@ -232,6 +250,9 @@ export function Sidebar() {
         return true;
       })
     : rawNavItems.filter((item) => {
+        if (!isAdmin && !isLeader) {
+          return ["dashboard", "polls-quizzes", "feedback", "notifications", "devotees", "families", "donations"].includes(item.id);
+        }
         if (!isAdmin && !isLeader && ADMIN_ONLY_PAGES.includes(item.id)) return false;
         if (!isAdmin && !canSeePage(item.id)) return false;
         return true;
@@ -308,75 +329,77 @@ export function Sidebar() {
         })}
 
         {/* ── GROUPS SECTION ── */}
-        <div className="pt-4">
-          {/* Section header — M3 label style */}
-          <div className="flex items-center justify-between px-3 mb-2">
-            <button
-              onClick={() => setGroupsOpen((v) => !v)}
-              className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-              data-testid="button-toggle-groups"
-            >
-              <div className={`transition-transform duration-200 ${groupsOpen ? "rotate-90" : ""}`}>
-                <ChevronRight className="w-3 h-3" />
-              </div>
-              Groups
-              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground text-[9px] font-bold">
-                {groupsData.length}
-              </span>
-            </button>
-            <button
-              onClick={() => setAddOpen(true)}
-              title="Add new group"
-              className="w-6 h-6 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200"
-              data-testid="button-add-group"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Group list */}
-          {groupsOpen && (
-            <div className="space-y-0.5">
-              {groupsData.length === 0 && (
-                <p className="text-xs text-muted-foreground/40 px-4 py-2 italic text-center">
-                  No groups yet
-                </p>
-              )}
-              {groupsData.map((group, idx) => {
-                const colors = GROUP_COLORS[idx % GROUP_COLORS.length];
-                const initials = groupInitials(group.groupName);
-                return (
-                  <div
-                    key={group.id}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-full hover:bg-foreground/6 transition-colors cursor-pointer group"
-                    title={group.description || group.groupName}
-                    data-testid={`nav-group-${group.id}`}
-                  >
-                    {/* M3 avatar bubble */}
-                    <div className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 text-[10px] font-black ring-1 ${colors.bg} ${colors.text} ${colors.ring}`}>
-                      {initials}
-                    </div>
-                    <span className="text-xs text-muted-foreground group-hover:text-foreground leading-tight min-w-0 break-words transition-colors font-medium">
-                      {group.groupName}
-                    </span>
-                  </div>
-                );
-              })}
-
-              {/* Add group inline button */}
+        {(isAdmin || isLeader) && (
+          <div className="pt-4">
+            {/* Section header — M3 label style */}
+            <div className="flex items-center justify-between px-3 mb-2">
+              <button
+                onClick={() => setGroupsOpen((v) => !v)}
+                className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                data-testid="button-toggle-groups"
+              >
+                <div className={`transition-transform duration-200 ${groupsOpen ? "rotate-90" : ""}`}>
+                  <ChevronRight className="w-3 h-3" />
+                </div>
+                Groups
+                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground text-[9px] font-bold">
+                  {groupsData.length}
+                </span>
+              </button>
               <button
                 onClick={() => setAddOpen(true)}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-full w-full text-left hover:bg-foreground/6 transition-colors text-muted-foreground/50 hover:text-muted-foreground"
-                data-testid="button-add-group-inline"
+                title="Add new group"
+                className="w-6 h-6 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200"
+                data-testid="button-add-group"
               >
-                <div className="w-7 h-7 rounded-xl border-2 border-dashed border-muted-foreground/20 flex items-center justify-center flex-shrink-0">
-                  <Plus className="w-3.5 h-3.5" />
-                </div>
-                <span className="text-xs font-medium">Add a group…</span>
+                <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
-          )}
-        </div>
+
+            {/* Group list */}
+            {groupsOpen && (
+              <div className="space-y-0.5">
+                {groupsData.length === 0 && (
+                  <p className="text-xs text-muted-foreground/40 px-4 py-2 italic text-center">
+                    No groups yet
+                  </p>
+                )}
+                {groupsData.map((group, idx) => {
+                  const colors = GROUP_COLORS[idx % GROUP_COLORS.length];
+                  const initials = groupInitials(group.groupName);
+                  return (
+                    <div
+                      key={group.id}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-full hover:bg-foreground/6 transition-colors cursor-pointer group"
+                      title={group.description || group.groupName}
+                      data-testid={`nav-group-${group.id}`}
+                    >
+                      {/* M3 avatar bubble */}
+                      <div className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 text-[10px] font-black ring-1 ${colors.bg} ${colors.text} ${colors.ring}`}>
+                        {initials}
+                      </div>
+                      <span className="text-xs text-muted-foreground group-hover:text-foreground leading-tight min-w-0 break-words transition-colors font-medium">
+                        {group.groupName}
+                      </span>
+                    </div>
+                  );
+                })}
+
+                {/* Add group inline button */}
+                <button
+                  onClick={() => setAddOpen(true)}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-full w-full text-left hover:bg-foreground/6 transition-colors text-muted-foreground/50 hover:text-muted-foreground"
+                  data-testid="button-add-group-inline"
+                >
+                  <div className="w-7 h-7 rounded-xl border-2 border-dashed border-muted-foreground/20 flex items-center justify-center flex-shrink-0">
+                    <Plus className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-xs font-medium">Add a group…</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Dynamic pages ── */}
         {dynamicPages.length > 0 && (
@@ -490,7 +513,7 @@ export function Sidebar() {
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={() => (window.location.href = "/api/logout")}
+            onClick={logout}
             className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
             data-testid="button-logout"
           >
