@@ -275,3 +275,161 @@ export async function seedDemoData() {
     console.error("Error seeding demo data:", error);
   }
 }
+
+import { db } from "./db";
+import { devotees, families, donations, volunteering } from "@shared/schema";
+import { eq } from "drizzle-orm";
+
+export async function seedSuperAdminDevotee() {
+  try {
+    const superAdminUserId = "111643723652847547849";
+    // Check if devotee profile already exists for Super-admin
+    const [existingDev] = await db.select().from(devotees).where(eq(devotees.userId, superAdminUserId));
+    if (existingDev) {
+      console.log("Super-admin devotee profile already exists.");
+      return;
+    }
+
+    console.log("Seeding Super-admin devotee profile and family members...");
+
+    // 1. Create family
+    const [family] = await db.insert(families).values({
+      familyName: "Admin Parivar",
+      address: "108 Bhakti Marg, Hari Kunj",
+      city: "New Delhi",
+      state: "Delhi",
+      pincode: "110001",
+      country: "India",
+      phone: "9876500000",
+      email: "admin.family@madhavparivar.org",
+      totalMembers: 5,
+      emergencyContact: "Radha Admin",
+      isActive: true,
+    }).returning();
+
+    // Count existing devotees to generate sequential ID
+    const allDevs = await db.select().from(devotees);
+    let nextId = allDevs.length + 1;
+
+    // 2. Create Super-admin devotee profile
+    const [superAdminDev] = await db.insert(devotees).values({
+      devoteeId: `MP-${String(nextId++).padStart(3, "0")}`,
+      userId: superAdminUserId,
+      firstName: "Dev",
+      lastName: "Admin",
+      email: "dev@madhavparivar.org",
+      phone: "9876500000",
+      whatsappNumber: "9876500000",
+      dateOfBirth: new Date("1980-05-15"),
+      gender: "Male",
+      address: "108 Bhakti Marg, Hari Kunj",
+      city: "New Delhi",
+      state: "Delhi",
+      pincode: "110001",
+      country: "India",
+      occupation: "System Administrator",
+      spiritualLevel: "Initiated",
+      familyId: family.id,
+      approvalStatus: "approved",
+      isActive: true,
+    }).returning();
+
+    // Update family head to superAdminDev
+    await db.update(families).set({ headOfFamily: superAdminDev.id }).where(eq(families.id, family.id));
+
+    // 3. Create 4 family members
+    const familyMembersData = [
+      { firstName: "Radha", lastName: "Admin", gender: "Female", dob: "1983-08-20", relation: "Wife", level: "Intermediate" },
+      { firstName: "Karan", lastName: "Admin", gender: "Male", dob: "2006-04-12", relation: "Son", level: "Beginner" },
+      { firstName: "Sita", lastName: "Admin", gender: "Female", dob: "2010-12-05", relation: "Daughter", level: "Beginner" },
+      { firstName: "Gopal", lastName: "Admin", gender: "Male", dob: "1952-01-20", relation: "Father", level: "Advanced" }
+    ];
+
+    const seededMembers: any[] = [];
+    for (const member of familyMembersData) {
+      const [m] = await db.insert(devotees).values({
+        devoteeId: `MP-${String(nextId++).padStart(3, "0")}`,
+        firstName: member.firstName,
+        lastName: member.lastName,
+        gender: member.gender,
+        dateOfBirth: new Date(member.dob),
+        spiritualLevel: member.level,
+        address: "108 Bhakti Marg, Hari Kunj",
+        city: "New Delhi",
+        state: "Delhi",
+        pincode: "110001",
+        country: "India",
+        familyId: family.id,
+        approvalStatus: "approved",
+        isActive: true,
+      }).returning();
+      seededMembers.push(m);
+    }
+
+    // 4. Seed donations for Super-admin and family
+    // Super-admin donations
+    await db.insert(donations).values({
+      devoteeId: superAdminDev.id,
+      amount: "5000.00",
+      donationType: "General",
+      paymentMethod: "UPI",
+      donationDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      receiptNumber: `REC-${superAdminDev.id}-1`,
+      notes: "Monthly contribution",
+    });
+
+    await db.insert(donations).values({
+      devoteeId: superAdminDev.id,
+      amount: "15000.00",
+      donationType: "Building Fund",
+      paymentMethod: "Net Banking",
+      donationDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      receiptNumber: `REC-${superAdminDev.id}-2`,
+      notes: "Temple dome fund",
+    });
+
+    // Family member donations
+    await db.insert(donations).values({
+      devoteeId: seededMembers[0].id, // Radha
+      amount: "2500.00",
+      donationType: "Festival",
+      paymentMethod: "UPI",
+      donationDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+      receiptNumber: `REC-${seededMembers[0].id}-1`,
+      notes: "Janmashtami offering",
+    });
+
+    await db.insert(donations).values({
+      devoteeId: seededMembers[3].id, // Gopal
+      amount: "1000.00",
+      donationType: "Medical",
+      paymentMethod: "Cash",
+      donationDate: new Date(Date.now() - 18 * 24 * 60 * 60 * 1000),
+      receiptNumber: `REC-${seededMembers[3].id}-1`,
+      notes: "Ayurvedic camp donation",
+    });
+
+    // 5. Seed volunteering hours
+    await db.insert(volunteering).values({
+      devoteeId: superAdminDev.id,
+      activityType: "Registration",
+      startDate: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+      hoursCompleted: 8,
+      description: "Admin panel registration support",
+      status: "completed",
+    });
+
+    await db.insert(volunteering).values({
+      devoteeId: seededMembers[1].id, // Karan
+      activityType: "Kirtan",
+      startDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      hoursCompleted: 4,
+      description: "Harmonium support during weekly satsang",
+      status: "completed",
+    });
+
+    console.log("Super-admin devotee profile and family seeded successfully!");
+  } catch (error) {
+    console.error("Failed to seed Super-admin devotee data:", error);
+  }
+}

@@ -1,18 +1,78 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Header } from "@/components/Layout/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
-import { Building, Phone, Mail, Award, Calendar, ArrowRight, MapPin, Briefcase } from "lucide-react";
+import { Building, Phone, Mail, Award, Calendar, ArrowRight, MapPin, Briefcase, Plus, UserPlus } from "lucide-react";
 import { format } from "date-fns";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function MyFamilyPage() {
   const [, navigate] = useLocation();
-  const { data: dashboardData, isLoading } = useQuery<any>({
+  const { toast } = useToast();
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    phone: "",
+    email: "",
+    gender: "Male",
+    dateOfBirth: "",
+    relation: "Spouse",
+  });
+
+  const { data: dashboardData, isLoading, refetch } = useQuery<any>({
     queryKey: ["/api/devotee/dashboard"],
   });
+
+  const addFamilyMutation = useMutation({
+    mutationFn: (payload: any) => apiRequest("POST", "/api/devotee/profile-update", payload),
+    onSuccess: () => {
+      toast({
+        title: "Request Submitted",
+        description: "Your request to add a family member has been submitted for admin approval.",
+      });
+      setAddDialogOpen(false);
+      setFormData({
+        firstName: "",
+        lastName: "",
+        phone: "",
+        email: "",
+        gender: "Male",
+        dateOfBirth: "",
+        relation: "Spouse",
+      });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Submission Failed",
+        description: err.message || "Failed to submit request. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.firstName || !formData.lastName) {
+      toast({
+        title: "Validation Error",
+        description: "First name and Last name are required.",
+        variant: "destructive",
+      });
+      return;
+    }
+    addFamilyMutation.mutate({
+      action: "add_family_member",
+      memberDetails: formData,
+    });
+  };
 
   if (isLoading || !dashboardData) {
     return (
@@ -56,9 +116,18 @@ export default function MyFamilyPage() {
               </p>
             </div>
           </div>
-          <Badge className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-1.5 rounded-full text-xs font-bold shrink-0">
-            Registered Family Unit
-          </Badge>
+          <div className="flex items-center gap-3 shrink-0">
+            <Button
+              onClick={() => setAddDialogOpen(true)}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 rounded-full text-xs flex items-center gap-1.5 shadow-sm border-0"
+            >
+              <UserPlus className="w-4 h-4" />
+              Add Family Member
+            </Button>
+            <Badge className="bg-amber-500/20 text-amber-700 hover:bg-amber-500/20 border-0 px-4 py-1.5 rounded-full text-xs font-bold">
+              Registered Family Unit
+            </Badge>
+          </div>
         </div>
 
         {/* Family Members Grid */}
@@ -67,9 +136,18 @@ export default function MyFamilyPage() {
             <Card className="col-span-full border-dashed border-border/60 py-12 text-center">
               <CardContent className="space-y-4">
                 <Building className="w-12 h-12 text-muted-foreground mx-auto" />
-                <div className="space-y-1">
+                <div className="space-y-2 max-w-sm mx-auto">
                   <h4 className="font-bold text-lg">No family connections found</h4>
-                  <p className="text-sm text-muted-foreground">Please request an administrator to link family records to your profile.</p>
+                  <p className="text-sm text-muted-foreground">Please submit a request to link family records to your profile.</p>
+                  <div className="pt-2">
+                    <Button 
+                      onClick={() => setAddDialogOpen(true)}
+                      className="bg-primary hover:bg-primary/95 text-white font-bold"
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Add Family Member
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -87,7 +165,7 @@ export default function MyFamilyPage() {
                 >
                   {/* Glassmorphic border glow for self */}
                   {isSelf && (
-                    <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-widest">
+                    <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-widest border-l border-b border-border/20">
                       You
                     </div>
                   )}
@@ -171,6 +249,133 @@ export default function MyFamilyPage() {
           )}
         </div>
       </main>
+
+      {/* Add Family Member Request Dialog */}
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="sm:max-w-lg rounded-3xl bg-[var(--surface-container-high,var(--card))] border border-border/60">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3 text-lg font-extrabold text-foreground">
+              <span className="w-8 h-8 flex items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <UserPlus className="w-4 h-4" />
+              </span>
+              Add Family Member Request
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
+              Provide the details of your family member. This request will be sent to the administrators for approval.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit} className="space-y-4 mt-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">First Name *</label>
+                <Input
+                  required
+                  value={formData.firstName}
+                  onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                  placeholder="First name"
+                  className="rounded-xl"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Last Name *</label>
+                <Input
+                  required
+                  value={formData.lastName}
+                  onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                  placeholder="Last name"
+                  className="rounded-xl"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Phone</label>
+                <Input
+                  value={formData.phone}
+                  onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="Phone number"
+                  className="rounded-xl"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Email</label>
+                <Input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="Email address"
+                  className="rounded-xl"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Gender</label>
+                <select
+                  value={formData.gender}
+                  onChange={(e) => setFormData(prev => ({ ...prev, gender: e.target.value }))}
+                  className="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5 col-span-2">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Date of Birth</label>
+                <Input
+                  type="date"
+                  value={formData.dateOfBirth}
+                  onChange={(e) => setFormData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
+                  className="rounded-xl"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Relation to You *</label>
+              <select
+                value={formData.relation}
+                onChange={(e) => setFormData(prev => ({ ...prev, relation: e.target.value }))}
+                className="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="Spouse">Spouse</option>
+                <option value="Wife">Wife</option>
+                <option value="Husband">Husband</option>
+                <option value="Son">Son</option>
+                <option value="Daughter">Daughter</option>
+                <option value="Father">Father</option>
+                <option value="Mother">Mother</option>
+                <option value="Brother">Brother</option>
+                <option value="Sister">Sister</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="submit"
+                className="flex-1 rounded-xl"
+                disabled={addFamilyMutation.isPending}
+              >
+                {addFamilyMutation.isPending ? "Submitting..." : "Submit Request"}
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="rounded-xl"
+                onClick={() => setAddDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

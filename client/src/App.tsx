@@ -314,7 +314,7 @@ function AppContent() {
 
   return (
     <div className={`h-screen flex bg-background flex-col ${isDevMode ? 'pt-7' : ''}`}>
-      {isViewingAsDevotee && (
+      {isViewingAsDevotee && isSuperAdmin && (
         <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold px-5 py-2.5 flex items-center justify-between z-50 shadow-elevation-2">
           <span className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-white animate-pulse" />

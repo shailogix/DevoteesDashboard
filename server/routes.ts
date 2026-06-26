@@ -7,6 +7,8 @@ import { db } from "./db";
 import { 
   users, 
   devotees, 
+  families,
+  donations,
   mentors,
   events, 
   devoteePendingUpdates, 
@@ -30,6 +32,50 @@ import { eq, and, desc, ne, sql } from "drizzle-orm";
 import { devConfig } from "./devConfig";
 
 import { randomBytes } from "crypto";
+
+function getViewingRole(req: any) {
+  const baseRole = req.user?.role || "user";
+  const viewAs = req.headers["x-view-as-role"];
+  const isPrivileged = baseRole === "super-admin" || baseRole === "admin" || baseRole === "leader";
+  if (isPrivileged && viewAs === "devotee") {
+    return "devotee";
+  }
+  return baseRole === "user" ? "devotee" : baseRole;
+}
+
+async function getEffectiveDevotee(req: any) {
+  const userId = req.user?.claims?.sub || "";
+  const [dev] = await db.select().from(devotees).where(eq(devotees.userId, userId));
+  if (dev) return dev;
+  
+  const baseRole = req.user?.role || "user";
+  if (baseRole === "admin" || baseRole === "super-admin" || baseRole === "leader") {
+    return {
+      id: 99999,
+      devoteeId: "MP-999",
+      userId: userId,
+      firstName: req.user?.firstName || "Dev",
+      lastName: req.user?.lastName || "Preview",
+      email: req.user?.email || "preview@madhavparivar.org",
+      phone: "9876543210",
+      whatsappNumber: "9876543210",
+      dateOfBirth: new Date("1990-01-01"),
+      gender: "Male",
+      address: "Preview Address",
+      city: "New Delhi",
+      state: "Delhi",
+      pincode: "110001",
+      country: "India",
+      occupation: "Staff",
+      spiritualLevel: "Intermediate",
+      familyId: null,
+      approvalStatus: "approved",
+      isActive: true,
+      mentorId: null
+    };
+  }
+  return null;
+}
 
 // GOD Mode session management — server-side authorization for privileged admin endpoints
 const godModeTokens = new Set<string>();
@@ -93,12 +139,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const dbUser = await storage.getUser(userId);
     if (!dbUser) return false;
     
-    // Admins and leaders have full access
-    const hasPrivilege = dbUser.role === "super-admin" || dbUser.role === "admin" || dbUser.role === "leader";
+    const effectiveRole = getViewingRole(req);
+    const hasPrivilege = effectiveRole === "super-admin" || effectiveRole === "admin" || effectiveRole === "leader";
     if (hasPrivilege) return true;
 
-    // Normal devotees can only access themselves and family
-    const [ownDevotee] = await db.select().from(devotees).where(eq(devotees.userId, userId));
+    const ownDevotee = await getEffectiveDevotee(req);
     if (!ownDevotee) return false;
 
     if (ownDevotee.id === devoteeId) return true;
@@ -420,15 +465,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dbUser = await storage.getUser(userId);
       if (!dbUser) return res.status(401).json({ message: "Unauthorized" });
 
-      const isAdmin = dbUser.role === "admin" || dbUser.role === "super-admin";
+      const effectiveRole = getViewingRole(req);
+      const isViewingAsAdmin = effectiveRole === "admin" || effectiveRole === "super-admin";
       
-      if (isAdmin) {
+      if (isViewingAsAdmin) {
         const devoteeId = req.query.devoteeId ? parseInt(req.query.devoteeId as string) : undefined;
         const donations = await storage.getDonations(devoteeId);
         return res.json(donations);
       } else {
-        // Normal devotee: fetch their own profile and family members
-        const [ownDevotee] = await db.select().from(devotees).where(eq(devotees.userId, userId));
+        // Normal devotee or admin/leader viewing as devotee: fetch their effective profile and family members
+        const ownDevotee = await getEffectiveDevotee(req);
         if (!ownDevotee) {
           return res.json([]);
         }
@@ -1051,6 +1097,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/families/:id/stats', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const effectiveRole = getViewingRole(req);
+      const isViewingAsPrivileged = effectiveRole === "admin" || effectiveRole === "super-admin" || effectiveRole === "leader";
+      if (!isViewingAsPrivileged) {
+        const ownDev = await getEffectiveDevotee(req);
+        if (!ownDev || ownDev.familyId !== id) {
+          return res.status(403).json({ message: "Forbidden" });
+        }
+      }
+
       const family = await storage.getFamily(id);
       if (!family) return res.status(404).json({ message: "Family not found" });
       const members = await storage.getDevoteesByFamily(id);
@@ -1097,7 +1152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) { res.status(500).json({ message: "Failed to fetch mandal members" }); }
   });
 
-  app.put('/api/families/:id', isAuthenticated, async (req, res) => {
+  app.put('/api/families/:id', isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertFamilySchema.partial().parse(req.body);
@@ -1109,7 +1164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/families/:id', isAuthenticated, async (req, res) => {
+  app.delete('/api/families/:id', isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteFamily(id);
@@ -1778,11 +1833,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/families/:id/members', isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
-      const isLeader = req.user?.isLeader;
-      const currentUserId = req.user?.claims?.sub;
-      if (!isLeader) {
-        const [dev] = await db.select().from(devotees).where(eq(devotees.userId, currentUserId));
-        if (!dev || dev.familyId !== id) {
+      const effectiveRole = getViewingRole(req);
+      const isViewingAsPrivileged = effectiveRole === "admin" || effectiveRole === "super-admin" || effectiveRole === "leader";
+      if (!isViewingAsPrivileged) {
+        const ownDev = await getEffectiveDevotee(req);
+        if (!ownDev || ownDev.familyId !== id) {
           return res.status(403).json({ message: "Forbidden" });
         }
       }
@@ -2359,13 +2414,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // --- Devotee Dashboard Page (T003) ---
   app.get('/api/devotee/dashboard', isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.claims?.sub || "";
     try {
-      const [dev] = await db.select().from(devotees).where(eq(devotees.userId, userId));
+      const dev = await getEffectiveDevotee(req);
       if (!dev) return res.status(404).json({ message: "Devotee profile not found" });
 
       const upcomingEvents = await db.select().from(events).where(eq(events.isDevoteeViewable, true));
-      const widgets = await db.select().from(devoteeDashboardWidgets).where(eq(devoteeDashboardWidgets.userId, userId));
+      const widgets = await db.select().from(devoteeDashboardWidgets).where(eq(devoteeDashboardWidgets.userId, dev.userId || ""));
       
       let familyMembers: any[] = [];
       if (dev.familyId) {
@@ -2489,9 +2543,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/devotee/profile-update', isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.claims?.sub || "";
     try {
-      const [dev] = await db.select().from(devotees).where(eq(devotees.userId, userId));
+      const dev = await getEffectiveDevotee(req);
       if (!dev) return res.status(404).json({ message: "Devotee profile not found" });
 
       await db.insert(devoteePendingUpdates).values({
@@ -2521,7 +2574,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [pending] = await db.select().from(devoteePendingUpdates).where(eq(devoteePendingUpdates.id, updateId));
       if (!pending) return res.status(404).json({ message: "Pending update request not found" });
 
-      await db.update(devotees).set(pending.updatedData as any).where(eq(devotees.id, pending.devoteeId));
+      const updatedData = pending.updatedData as any;
+      if (updatedData && updatedData.action === "add_family_member") {
+        let requesterDevotee = null;
+        if (pending.devoteeId === 99999) {
+          const allFamilies = await db.select().from(families).limit(1);
+          if (allFamilies.length > 0) {
+            requesterDevotee = { familyId: allFamilies[0].id, lastName: "Admin" };
+          }
+        } else {
+          const [rd] = await db.select().from(devotees).where(eq(devotees.id, pending.devoteeId));
+          requesterDevotee = rd;
+        }
+
+        if (requesterDevotee) {
+          let familyId = requesterDevotee.familyId;
+          if (!familyId) {
+            const [newFamily] = await db.insert(families).values({
+              familyName: `${requesterDevotee.lastName || "Devotee"} Family`,
+              isActive: true,
+            }).returning();
+            familyId = newFamily.id;
+            if (pending.devoteeId !== 99999 && requesterDevotee.id) {
+              await db.update(devotees).set({ familyId }).where(eq(devotees.id, requesterDevotee.id));
+            }
+          }
+
+          const allDevs = await db.select().from(devotees);
+          const nextId = allDevs.length + 1;
+          const details = updatedData.memberDetails || {};
+
+          await db.insert(devotees).values({
+            devoteeId: `MP-${String(nextId).padStart(3, "0")}`,
+            firstName: details.firstName || "Family",
+            lastName: details.lastName || requesterDevotee.lastName || "Member",
+            email: details.email || null,
+            phone: details.phone || null,
+            gender: details.gender || "Male",
+            dateOfBirth: details.dateOfBirth ? new Date(details.dateOfBirth) : null,
+            spiritualLevel: "Beginner",
+            familyId: familyId,
+            approvalStatus: "approved",
+            isActive: true,
+          });
+        }
+      } else {
+        await db.update(devotees).set(pending.updatedData as any).where(eq(devotees.id, pending.devoteeId));
+      }
+
       await db.update(devoteePendingUpdates).set({
         status: "approved",
         reviewedBy: req.user?.claims?.sub,

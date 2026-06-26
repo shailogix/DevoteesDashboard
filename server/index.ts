@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic } from "./vite";
-import { seedDemoData } from "./seedData";
+import { seedDemoData, seedSuperAdminDevotee } from "./seedData";
 
 const app = express();
 app.use(express.json());
@@ -46,6 +46,11 @@ app.use((req, res, next) => {
       await seedDemoData();
     } catch (error: any) {
       console.log("Demo data already exists or seeding failed:", error.message);
+    }
+    try {
+      await seedSuperAdminDevotee();
+    } catch (error: any) {
+      console.log("Super-admin devotee seeding failed:", error.message);
     }
   }
 

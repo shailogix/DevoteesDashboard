@@ -17,14 +17,14 @@ const FEATURES = [
 
 export default function Login() {
   const { isAuthenticated, user, isLoading } = useAuth();
-  const isActualAdmin = user?.role === "admin" || user?.role === "super-admin";
-  const showPortalChoice = isAuthenticated && isActualAdmin && typeof window !== 'undefined' && sessionStorage.getItem("portal_choice_made") !== "true";
+  const needsPortalChoice = user?.role === "admin" || user?.role === "leader";
+  const showPortalChoice = isAuthenticated && needsPortalChoice && typeof window !== 'undefined' && sessionStorage.getItem("portal_choice_made") !== "true";
 
   useEffect(() => {
-    if (isAuthenticated && (!isActualAdmin || (typeof window !== 'undefined' && sessionStorage.getItem("portal_choice_made") === "true"))) {
+    if (isAuthenticated && (!needsPortalChoice || (typeof window !== 'undefined' && sessionStorage.getItem("portal_choice_made") === "true"))) {
       window.location.href = "/";
     }
-  }, [isAuthenticated, isActualAdmin]);
+  }, [isAuthenticated, needsPortalChoice]);
 
   if (isLoading) {
     return (
@@ -35,6 +35,7 @@ export default function Login() {
   }
 
   if (showPortalChoice) {
+    const isAdminRole = user?.role === "admin";
     return (
       <div className="min-h-screen bg-background particle-bg flex items-center justify-center p-4">
         {/* Ambient glows */}
@@ -53,12 +54,12 @@ export default function Login() {
                 </div>
                 <h1 className="text-3xl font-black text-foreground tracking-tight">Choose Your Portal View</h1>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                  As an administrator, you have access to both management dashboards. Select how you would like to proceed.
+                  As a {user?.role}, you have access to both management/leader dashboards and your personal records. Select how you would like to proceed.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Admin Card */}
+                {/* Admin/Leader Card */}
                 <button
                   onClick={() => {
                     localStorage.removeItem("view_as_role");
@@ -72,9 +73,13 @@ export default function Login() {
                       <Shield className="w-6 h-6" />
                     </div>
                     <div>
-                      <h3 className="font-extrabold text-base text-foreground group-hover:text-amber-700 dark:group-hover:text-amber-500 transition-colors">Admin Portal View</h3>
+                      <h3 className="font-extrabold text-base text-foreground group-hover:text-amber-700 dark:group-hover:text-amber-500 transition-colors">
+                        {isAdminRole ? "Admin Portal View" : "Leader Portal View"}
+                      </h3>
                       <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-                        Access the full database management dashboard, track all devotees, run attendance, record donations, view global analytics, and configure settings.
+                        {isAdminRole 
+                          ? "Access the full database management dashboard, track all devotees, run attendance, record donations, view global analytics, and configure settings."
+                          : "Access the leader dashboard to coordinate congregation attendance, view RSVPs, schedule upcoming events, and manage volunteering tasks."}
                       </p>
                     </div>
                   </div>
