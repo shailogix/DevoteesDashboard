@@ -110,7 +110,19 @@ export function DevoteeList() {
   const spiritualLevels = ["Beginner", "Intermediate", "Advanced", "Teacher", "Mentor", "Guide"];
 
   if (isLoading) {
-    return <div className="flex justify-center p-8">Loading devotees...</div>;
+    return (
+      <div className="flex justify-center items-center p-12">
+        <div className="text-center space-y-4 animate-fade-in-up">
+          <div className="relative inline-flex">
+            <div className="absolute inset-0 rounded-3xl bg-primary/20 blur-xl animate-pulse" />
+            <div className="relative w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center shadow-elevation-2 animate-spring-pop">
+              <span className="text-primary-foreground text-lg font-black">॥</span>
+            </div>
+          </div>
+          <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Loading Devotees…</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -260,7 +272,7 @@ export function DevoteeList() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="icon-sm">
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>

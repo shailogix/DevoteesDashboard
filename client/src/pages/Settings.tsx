@@ -24,6 +24,7 @@ import {
   Sun,
   Monitor,
   Key,
+  Sparkles,
 } from "lucide-react";
 
 export default function Settings() {
@@ -42,16 +43,25 @@ export default function Settings() {
     systemMaintenance: true,
   });
 
+  const [greetingInput, setGreetingInput] = useState(() => localStorage.getItem("devotional_greeting") || "Jai Shree Madhav 🙏🏻");
+  const [scripturePref, setScripturePref] = useState(() => localStorage.getItem("scripture_preference") || "gita");
+
   const tabs = [
     { id: "profile", label: "Profile", icon: User },
     { id: "appearance", label: "Appearance", icon: Palette },
+    { id: "devotional", label: "Devotional Settings", icon: Sparkles },
     { id: "notifications", label: "Notifications", icon: Bell },
     { id: "security", label: "Security", icon: Shield },
     { id: "encryption", label: "Encryption", icon: Key },
   ];
 
   const handleSave = () => {
+    localStorage.setItem("devotional_greeting", greetingInput);
+    localStorage.setItem("scripture_preference", scripturePref);
     toast({ title: "Settings Saved", description: "Your preferences have been updated." });
+    setTimeout(() => {
+      window.location.reload();
+    }, 800);
   };
 
   return (
@@ -92,10 +102,11 @@ export default function Settings() {
 
                 {/* Content */}
                 <div className="md:col-span-5 p-6">
-                  <Tabs defaultValue="profile" className="space-y-6">
-                    <TabsList className="grid w-full grid-cols-5">
+                  <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                    <TabsList className="grid w-full grid-cols-6">
                       <TabsTrigger value="profile">Profile</TabsTrigger>
                       <TabsTrigger value="appearance">Appearance</TabsTrigger>
+                      <TabsTrigger value="devotional">Devotional</TabsTrigger>
                       <TabsTrigger value="notifications">Notifications</TabsTrigger>
                       <TabsTrigger value="security">Security</TabsTrigger>
                       <TabsTrigger value="encryption">Encryption</TabsTrigger>
@@ -225,6 +236,44 @@ export default function Settings() {
                                 <SelectItem value="hi">हिन्दी (Hindi)</SelectItem>
                                 <SelectItem value="gu">ગુજરાતી (Gujarati)</SelectItem>
                                 <SelectItem value="mr">मराठी (Marathi)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+
+                    <TabsContent value="devotional">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center space-x-2">
+                            <Sparkles className="w-5 h-5 text-amber-500" />
+                            <span>Devotional Configuration</span>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                          <div className="space-y-2">
+                            <Label htmlFor="systemGreeting" className="text-sm font-medium">Default Devotional Greeting</Label>
+                            <p className="text-xs text-muted-foreground">This greeting is shown in dashboards, headers, receipts, and ID card headers.</p>
+                            <Input 
+                              id="systemGreeting" 
+                              value={greetingInput} 
+                              onChange={(e) => setGreetingInput(e.target.value)} 
+                              placeholder="e.g. Jai Shree Madhav 🙏🏻"
+                            />
+                          </div>
+                          <Separator />
+                          <div className="space-y-2">
+                            <Label htmlFor="scripturePreference" className="text-sm font-medium">Daily Scripture Preference</Label>
+                            <p className="text-xs text-muted-foreground">Select which scripture is used to display the Verse of the Day on devotee portals.</p>
+                            <Select value={scripturePref} onValueChange={setScripturePref}>
+                              <SelectTrigger className="w-64">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="gita">Bhagavad Gita</SelectItem>
+                                <SelectItem value="bhagavatam">Shrimad Bhagavatam</SelectItem>
+                                <SelectItem value="upanishads">Upanishads</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>

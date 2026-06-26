@@ -17,10 +17,36 @@ export default function DevoteeDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
+  const [simulatingAlert, setSimulatingAlert] = useState(false);
 
   const { data: dashboardData, isLoading } = useQuery<any>({
     queryKey: ["/api/devotee/dashboard"],
   });
+
+  const triggerAlertCheck = async () => {
+    setSimulatingAlert(true);
+    try {
+      const res = await fetch("/api/panchang/check-alerts", { method: "POST" });
+      if (!res.ok) throw new Error("Failed to dispatch alert");
+      const data = await res.json();
+      
+      // Invalidate notifications
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      
+      toast({
+        title: "Panchang Alert Triggered!",
+        description: `Simulated dispatch of "${data.alert.name}" email & SMS logs created. Check notifications pane!`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Alert Check Failed",
+        description: err.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSimulatingAlert(false);
+    }
+  };
 
   const [formData, setFormData] = useState<any>({});
 
@@ -52,13 +78,65 @@ export default function DevoteeDashboard() {
 
   if (isLoading || !dashboardData) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="flex-1 flex items-center justify-center bg-background particle-bg">
+        <div className="text-center space-y-5 animate-fade-in-up">
+          <div className="relative inline-flex">
+            <div className="absolute inset-0 rounded-3xl bg-primary/20 blur-xl animate-pulse" />
+            <div className="relative w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center shadow-elevation-3 animate-spring-pop">
+              <span className="text-primary-foreground text-2xl font-black">॥</span>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Madhav Parivar</h1>
+            <p className="text-muted-foreground text-sm font-medium">Loading Devotee Portal…</p>
+          </div>
+        </div>
       </div>
     );
   }
 
-  const { devotee, upcomingEvents = [], familyMembers = [] } = dashboardData;
+  const { devotee, upcomingEvents = [], familyMembers = [], stats = {} } = dashboardData;
+  
+  const { totalVolHours = 0, totalAttendance = 0, donationCount = 0, totalDonationAmount = 0, isMentor = false } = stats;
+
+  const achievements = [
+    {
+      id: "seva_champion",
+      title: "Seva Champion",
+      description: "Earned by completing 50+ hours of volunteering service.",
+      unlocked: totalVolHours >= 50,
+      progress: `${totalVolHours} / 50 hrs`,
+      icon: "🎖️",
+      color: "from-amber-400 to-yellow-600",
+    },
+    {
+      id: "satsang_regular",
+      title: "Satsang Regular",
+      description: "Earned by attending 10+ congregation programs.",
+      unlocked: totalAttendance >= 10,
+      progress: `${totalAttendance} / 10 programs`,
+      icon: "🚩",
+      color: "from-orange-400 to-red-600",
+    },
+    {
+      id: "daan_veer",
+      title: "Daan Veer",
+      description: "Earned with 3+ donations or total contribution >= ₹5,000.",
+      unlocked: donationCount >= 3 || totalDonationAmount >= 5000,
+      progress: `₹${totalDonationAmount} (${donationCount} times)`,
+      icon: "🤝",
+      color: "from-emerald-400 to-teal-600",
+    },
+    {
+      id: "community_guide",
+      title: "Community Guide",
+      description: "Earned by registering as a spiritual mentor/counselor.",
+      unlocked: isMentor,
+      progress: isMentor ? "Active Mentor" : "Not registered",
+      icon: "🔱",
+      color: "from-purple-400 to-indigo-600",
+    },
+  ];
 
   const startEdit = () => {
     setFormData({
@@ -91,11 +169,13 @@ export default function DevoteeDashboard() {
   const panchang = getDailyPanchang();
   const scripture = getScriptureOfTheDay();
 
+  const devotionalGreeting = localStorage.getItem("devotional_greeting") || "Jai Shree Madhav 🙏🏻";
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
       <Header 
         title="Devotee Portal" 
-        subtitle="॥ Hare Krishna ॥ Manage your profile, view upcoming events, and participate in community service" 
+        subtitle={`॥ ${devotionalGreeting} ॥ Manage your profile, view upcoming events, and participate in community service`} 
       />
 
       <main className="flex-1 overflow-y-auto p-6 space-y-6 max-w-7xl mx-auto w-full">
@@ -137,6 +217,17 @@ export default function DevoteeDashboard() {
                   <p className="font-bold text-xs">🚩 Festival: {panchang.festival} 🚩</p>
                 </div>
               )}
+
+              {/* Simulated Alerts Trigger */}
+              <div className="mt-4 pt-3 border-t border-amber-100/30">
+                <Button 
+                  onClick={triggerAlertCheck} 
+                  disabled={simulatingAlert}
+                  className="w-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold border border-amber-500/30 text-xs py-1.5 h-auto"
+                >
+                  <Sun className="w-3.5 h-3.5 mr-1.5 animate-pulse" /> Simulate Daily Alert Dispatch
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
@@ -317,6 +408,54 @@ export default function DevoteeDashboard() {
                     </CardContent>
                   </Card>
                 )}
+
+                {/* Spiritual Milestones & Badges */}
+                <Card className="border border-amber-500/20 bg-gradient-to-b from-amber-500/5 to-transparent shadow-elevation-1">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                      <Award className="w-4 h-4 text-amber-600 animate-pulse" /> Spiritual Milestones & Badges
+                    </CardTitle>
+                    <CardDescription className="text-xs">Unlocks as you participate in community service, attendance, and giving</CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {achievements.map((badge) => (
+                        <div
+                          key={badge.id}
+                          className={[
+                            "relative p-4 rounded-2xl border flex flex-col justify-between transition-all duration-300",
+                            badge.unlocked
+                              ? "bg-card border-amber-500/30 shadow-sm hover:shadow-elevation-2 hover:-translate-y-0.5 group cursor-pointer"
+                              : "bg-muted/40 border-muted opacity-40 select-none"
+                          ].join(" ")}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            {/* M3 squircle icon container */}
+                            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${badge.color} flex items-center justify-center text-xl shadow-elevation-1`}>
+                              {badge.icon}
+                            </div>
+                            {badge.unlocked ? (
+                              <Badge variant="success" className="text-[10px] font-bold py-0.5">Unlocked</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] py-0.5 opacity-60">Locked</Badge>
+                            )}
+                          </div>
+                          <div className="mt-3">
+                            <h5 className="font-bold text-xs text-foreground">{badge.title}</h5>
+                            <p className="text-[10px] text-muted-foreground mt-1 leading-normal">{badge.description}</p>
+                          </div>
+                          <div className="mt-3 pt-2.5 border-t border-border/40 flex justify-between items-center text-[10px]">
+                            <span className="text-muted-foreground font-medium">Progress:</span>
+                            <span className={[
+                              "font-bold",
+                              badge.unlocked ? "text-primary" : "text-muted-foreground"
+                            ].join(" ")}>{badge.progress}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
 
                 {/* Upcoming Events */}
                 <Card className="border border-border/40 bg-card">

@@ -29,12 +29,23 @@ export function useAuth() {
     }
   };
 
-  const isAdmin = user?.role === "admin" || user?.role === "super-admin";
   const isSuperAdmin = user?.role === "super-admin";
+  const isViewingAsDevotee = isSuperAdmin && typeof window !== 'undefined' && localStorage.getItem("view_as_role") === "devotee";
+  
+  const isAdmin = (user?.role === "admin" || user?.role === "super-admin") && !isViewingAsDevotee;
+  const isLeader = (user?.role === "leader" || user?.role === "admin" || user?.role === "super-admin") && !isViewingAsDevotee;
   const isApproved = user?.approvalStatus === "approved" || isSuperAdmin;
-  const hasRole = (role: string) => user?.role === role || isSuperAdmin;
+  const hasRole = (role: string) => (user?.role === role || isSuperAdmin) && !isViewingAsDevotee;
+
+  // Pages accessible to leaders (read-only or operational tasks)
+  const LEADER_PAGES = [
+    "dashboard", "devotees", "groups", "mentors", "attendance",
+    "volunteering", "events", "notifications", "polls-quizzes", "feedback"
+  ];
+
   const canSeePage = (pageId: string) => {
     if (isAdmin) return true;
+    if (isLeader && LEADER_PAGES.includes(pageId)) return true;
     const visiblePages = permissions?.visiblePages || [];
     return visiblePages.includes(pageId);
   };
@@ -46,7 +57,9 @@ export function useAuth() {
     error,
     logout,
     isAdmin,
+    isLeader,
     isSuperAdmin,
+    isViewingAsDevotee,
     isApproved,
     hasRole,
     canSeePage,

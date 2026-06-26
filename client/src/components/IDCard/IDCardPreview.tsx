@@ -247,7 +247,7 @@ export function IDCardPreview({ devotee, settings, scale = 1 }: IDCardPreviewPro
             </div>
             {customMessage && <p className="text-[9px] text-gray-400 italic mt-2">{customMessage}</p>}
             <div className="flex items-center justify-between mt-3 pt-2 border-t border-orange-100">
-              <p className="text-[9px] text-gray-400">Jai Shri Krishna</p>
+              <p className="text-[9px] text-gray-400">{localStorage.getItem("devotional_greeting") || "Jai Shree Madhav 🙏🏻"}</p>
               {showQR && <QRPlaceholder size={40} color="#ea580c" />}
             </div>
           </div>

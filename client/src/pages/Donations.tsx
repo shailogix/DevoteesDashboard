@@ -608,7 +608,7 @@ export default function Donations() {
                 <div className="border-t border-dashed border-border" />
                 <div className="text-center text-xs text-muted-foreground">
                   This receipt is computer-generated and is valid without a signature.
-                  <br />Thank you for your generous contribution. Jai Swaminarayan 🙏
+                  <br />Thank you for your generous contribution. {localStorage.getItem("devotional_greeting") || "Jai Shree Madhav 🙏🏻"}
                 </div>
               </div>
             </div>

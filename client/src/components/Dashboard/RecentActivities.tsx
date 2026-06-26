@@ -103,13 +103,14 @@ export function RecentActivities() {
 
               return (
                 <Wrapper key={activity.id} {...wrapperProps}>
-                  <div className="flex items-center space-x-3 p-3 bg-muted/50 rounded-lg hover:bg-muted/80 transition-colors cursor-pointer">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-br ${activity.color}`}>
-                      <Icon className="w-4 h-4 text-white" />
+                  <div className="flex items-center space-x-3.5 p-3.5 bg-muted/40 rounded-2xl hover:bg-muted/70 transition-all duration-200 cursor-pointer">
+                    {/* M3 expressive rounded-xl icon bubble */}
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-br shadow-sm ${activity.color}`}>
+                      <Icon className="w-4.5 h-4.5 text-white" />
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">{activity.message}</p>
-                      <p className="text-xs text-muted-foreground">{activity.time}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-foreground truncate">{activity.message}</p>
+                      <p className="text-xs text-muted-foreground/80 mt-0.5 font-medium">{activity.time}</p>
                     </div>
                   </div>
                 </Wrapper>

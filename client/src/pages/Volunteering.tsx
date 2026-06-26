@@ -13,10 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { HandHeart, Plus, Clock, Award, Users, Activity, Edit, Trash2, Calendar, Search } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { HandHeart, Plus, Clock, Award, Users, Activity, Edit, Trash2, Calendar, Search, ChevronLeft, ChevronRight, MapPin, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
 import type { Devotee } from "@shared/schema";
 
 interface VolRecord {
@@ -47,7 +49,201 @@ const ACTIVITY_COLORS: Record<string, string> = {
   Cleanup: "bg-yellow-100 text-yellow-800 border-yellow-200",
 };
 
+interface VolunteeringShift {
+  id: number;
+  activityType: string;
+  description: string | null;
+  location: string | null;
+  startDate: string;
+  endDate: string;
+  capacity: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+function SevaSchedulerTab({ 
+  shifts, 
+  shiftsLoading, 
+  isAdmin, 
+  signupShiftMutation, 
+  createShiftMutation,
+  selectedShift,
+  setSelectedShift,
+  isShiftFormOpen,
+  setIsShiftFormOpen,
+  newShiftData,
+  setNewShiftData
+}: {
+  shifts: VolunteeringShift[];
+  shiftsLoading: boolean;
+  isAdmin: boolean;
+  signupShiftMutation: any;
+  createShiftMutation: any;
+  selectedShift: VolunteeringShift | null;
+  setSelectedShift: (s: VolunteeringShift | null) => void;
+  isShiftFormOpen: boolean;
+  setIsShiftFormOpen: (open: boolean) => void;
+  newShiftData: any;
+  setNewShiftData: (d: any) => void;
+}) {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+
+  const handlePrevMonth = () => {
+    setCurrentDate(new Date(year, month - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(new Date(year, month + 1, 1));
+  };
+
+  const handleToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayIndex = new Date(year, month, 1).getDay();
+
+  const days = [];
+  // Padding cells
+  for (let i = 0; i < firstDayIndex; i++) {
+    days.push(null);
+  }
+  // Days of month
+  for (let i = 1; i <= daysInMonth; i++) {
+    days.push(new Date(year, month, i));
+  }
+
+  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const getShiftsForDate = (date: Date) => {
+    return shifts.filter(s => {
+      const sDate = new Date(s.startDate);
+      return sDate.getFullYear() === date.getFullYear() &&
+             sDate.getMonth() === date.getMonth() &&
+             sDate.getDate() === date.getDate();
+    });
+  };
+
+  const handleOpenAddShift = (date: Date) => {
+    const defaultStart = new Date(date);
+    defaultStart.setHours(16, 0, 0, 0); // 4 PM default
+    const defaultEnd = new Date(date);
+    defaultEnd.setHours(19, 0, 0, 0); // 7 PM default
+
+    setNewShiftData({
+      activityType: "Cooking",
+      description: "",
+      location: "Feast Kitchen",
+      startDate: defaultStart.toISOString().slice(0, 16),
+      endDate: defaultEnd.toISOString().slice(0, 16),
+      capacity: 5,
+    });
+    setIsShiftFormOpen(true);
+  };
+
+  return (
+    <Card className="border border-border/80">
+      <CardHeader className="pb-3 border-b border-border/40">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-amber-500" />
+              Seva Calendar Shifts
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">Select a shift to volunteer or coordinate shifts.</p>
+          </div>
+          <div className="flex items-center gap-2 bg-muted/40 p-1 rounded-lg border">
+            <Button variant="ghost" size="sm" onClick={handlePrevMonth} className="h-8 w-8 p-0">
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <span className="text-xs font-semibold px-2 min-w-[100px] text-center">
+              {currentDate.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
+            </span>
+            <Button variant="ghost" size="sm" onClick={handleNextMonth} className="h-8 w-8 p-0">
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            <span className="h-6 w-[1px] bg-border mx-1" />
+            <Button variant="ghost" size="sm" onClick={handleToday} className="h-8 text-xs font-semibold px-2">
+              Today
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-4">
+        {shiftsLoading ? (
+          <div className="flex justify-center py-16"><RefreshCw className="w-8 h-8 animate-spin text-primary" /></div>
+        ) : (
+          <div className="space-y-4">
+            {/* Weekdays headers */}
+            <div className="grid grid-cols-7 gap-1 text-center font-bold text-xs uppercase tracking-wider text-muted-foreground bg-muted/20 py-2 rounded">
+              {weekdays.map(d => <div key={d}>{d}</div>)}
+            </div>
+
+            {/* Calendar grid cells */}
+            <div className="grid grid-cols-7 gap-1.5 min-h-[350px]">
+              {days.map((date, idx) => {
+                if (!date) {
+                  return <div key={`empty-${idx}`} className="bg-muted/10 rounded-lg border border-transparent min-h-[70px]"></div>;
+                }
+                const dayShifts = getShiftsForDate(date);
+                const isToday = new Date().toDateString() === date.toDateString();
+
+                return (
+                  <div 
+                    key={date.toISOString()} 
+                    className={`group relative rounded-lg border p-1.5 min-h-[85px] flex flex-col justify-between hover:bg-muted/30 transition-colors ${
+                      isToday 
+                        ? "bg-amber-500/5 border-amber-500 shadow-sm shadow-amber-500/5" 
+                        : "border-border/60 bg-card"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className={`text-[11px] font-bold h-5 w-5 flex items-center justify-center rounded-full ${
+                        isToday ? "bg-amber-500 text-white font-black" : "text-muted-foreground"
+                      }`}>
+                        {date.getDate()}
+                      </span>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleOpenAddShift(date)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-primary-foreground h-4 w-4 rounded flex items-center justify-center text-[10px] shadow hover:scale-105"
+                          title="Create Shift"
+                        >
+                          <Plus className="w-2.5 h-2.5" />
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div className="mt-1 space-y-1 overflow-y-auto flex-1 max-h-[75px] scrollbar-none">
+                      {dayShifts.map(s => {
+                        const sTime = new Date(s.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        return (
+                          <div
+                            key={s.id}
+                            onClick={() => setSelectedShift(s)}
+                            className="text-[9px] font-semibold p-1 rounded border border-amber-500/20 bg-amber-500/5 text-amber-800 dark:text-amber-300 cursor-pointer hover:bg-amber-500/10 truncate"
+                            title={`${s.activityType} (${sTime})`}
+                          >
+                            {sTime} {s.activityType}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function VolunteeringPage() {
+  const { isAdmin } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedActivity, setSelectedActivity] = useState("all");
   const [selectedMonth, setSelectedMonth] = useState("all");
@@ -62,8 +258,44 @@ export default function VolunteeringPage() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
 
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedShift, setSelectedShift] = useState<VolunteeringShift | null>(null);
+  const [isShiftFormOpen, setIsShiftFormOpen] = useState(false);
+  const [newShiftData, setNewShiftData] = useState({
+    activityType: "Cooking",
+    description: "",
+    location: "Feast Kitchen",
+    startDate: new Date().toISOString().slice(0, 16),
+    endDate: new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 16),
+    capacity: 5,
+  });
+
   const { data: records = [], isLoading } = useQuery<VolRecord[]>({ queryKey: ["/api/volunteering"] });
   const { data: devotees = [] } = useQuery<Devotee[]>({ queryKey: ["/api/devotees"] });
+  
+  const { data: shifts = [], isLoading: shiftsLoading } = useQuery<VolunteeringShift[]>({ 
+    queryKey: ["/api/volunteering-shifts"] 
+  });
+
+  const createShiftMutation = useMutation({
+    mutationFn: async (data: any) => apiRequest("POST", "/api/volunteering-shifts", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/volunteering-shifts"] });
+      toast({ title: "Success", description: "Volunteering shift created" });
+      setIsShiftFormOpen(false);
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message || "Failed to create shift", variant: "destructive" }),
+  });
+
+  const signupShiftMutation = useMutation({
+    mutationFn: async (shiftId: number) => apiRequest("POST", `/api/volunteering-shifts/${shiftId}/signup`, {}).then(res => res.json()),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/volunteering"] });
+      toast({ title: "Success", description: data.message || "Signed up for shift successfully!" });
+      setSelectedShift(null);
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message || "Already signed up or failed to join", variant: "destructive" }),
+  });
 
   const getDevoteeName = (id: number) => {
     const d = devotees.find((dv: Devotee) => dv.id === id);
@@ -182,10 +414,23 @@ export default function VolunteeringPage() {
           <Card><CardContent className="pt-4 pb-3"><div className="flex items-center gap-3"><Activity className="w-8 h-8 text-purple-600" /><div><p className="text-2xl font-bold">{records.length}</p><p className="text-xs text-muted-foreground">Total Records</p></div></div></CardContent></Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3">
-            <Card>
-              <CardHeader>
+        <Tabs defaultValue="logs" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsTrigger value="logs" className="flex items-center space-x-2">
+              <HandHeart className="w-4 h-4" />
+              <span>Volunteering Logs</span>
+            </TabsTrigger>
+            <TabsTrigger value="scheduler" className="flex items-center space-x-2">
+              <Calendar className="w-4 h-4" />
+              <span>Seva Scheduler</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="logs">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              <div className="lg:col-span-3">
+                <Card>
+                  <CardHeader>
                 <div className="flex items-center justify-between flex-wrap gap-3">
                   <CardTitle className="flex items-center gap-2"><HandHeart className="w-5 h-5 text-primary" /> Volunteering Records ({filteredRecords.length})</CardTitle>
                   <div className="flex flex-wrap gap-2">
@@ -354,6 +599,24 @@ export default function VolunteeringPage() {
             </Card>
           </div>
         </div>
+        </TabsContent>
+
+        <TabsContent value="scheduler">
+          <SevaSchedulerTab 
+            shifts={shifts}
+            shiftsLoading={shiftsLoading}
+            isAdmin={isAdmin}
+            signupShiftMutation={signupShiftMutation}
+            createShiftMutation={createShiftMutation}
+            selectedShift={selectedShift}
+            setSelectedShift={setSelectedShift}
+            isShiftFormOpen={isShiftFormOpen}
+            setIsShiftFormOpen={setIsShiftFormOpen}
+            newShiftData={newShiftData}
+            setNewShiftData={setNewShiftData}
+          />
+        </TabsContent>
+        </Tabs>
       </main>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
@@ -423,6 +686,149 @@ export default function VolunteeringPage() {
               <Button type="button" variant="outline" onClick={() => { setIsFormOpen(false); setEditRecord(null); }}>Cancel</Button>
               <Button type="submit" disabled={!formData.devoteeId || !formData.activityType || createMutation.isPending || updateMutation.isPending} className="bg-gradient-to-r from-primary to-secondary">
                 {editRecord ? "Save Changes" : "Log Activity"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Shift Details Dialog */}
+      <Dialog open={!!selectedShift} onOpenChange={() => setSelectedShift(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-primary font-bold">
+              <Calendar className="w-5 h-5" />
+              {selectedShift?.activityType} Seva Shift
+            </DialogTitle>
+          </DialogHeader>
+          {selectedShift && (
+            <div className="space-y-4 text-sm">
+              <div className="space-y-1 bg-muted/40 p-3 rounded-lg border">
+                <div className="flex items-center gap-2 text-muted-foreground font-medium text-xs">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Time Slot</span>
+                </div>
+                <p className="font-semibold text-foreground text-xs mt-0.5">
+                  {new Date(selectedShift.startDate).toLocaleDateString("en-IN", { weekday: 'long', day: 'numeric', month: 'long' })}
+                </p>
+                <p className="text-xs text-muted-foreground font-bold">
+                  {new Date(selectedShift.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(selectedShift.endDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+
+              {selectedShift.location && (
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-muted-foreground" />
+                  <span>Location: <strong>{selectedShift.location}</strong></span>
+                </div>
+              )}
+
+              {selectedShift.description && (
+                <div className="space-y-1">
+                  <p className="font-semibold text-xs text-muted-foreground">Description:</p>
+                  <p className="bg-muted/10 p-2.5 rounded border border-border/40 text-xs italic">{selectedShift.description}</p>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center text-xs">
+                <span>Volunteer Capacity:</span>
+                <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary font-bold">
+                  {selectedShift.capacity} slots available
+                </Badge>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setSelectedShift(null)}>Close</Button>
+                <Button 
+                  onClick={() => signupShiftMutation.mutate(selectedShift.id)} 
+                  disabled={signupShiftMutation.isPending}
+                  className="bg-gradient-to-r from-primary to-secondary font-bold"
+                >
+                  {signupShiftMutation.isPending ? "Signing up..." : "Sign Up for Seva"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Admin: Create Shift Dialog */}
+      <Dialog open={isShiftFormOpen} onOpenChange={setIsShiftFormOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-bold"><Plus className="w-5 h-5 text-primary" /> Create Seva Shift</DialogTitle>
+          </DialogHeader>
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              createShiftMutation.mutate(newShiftData);
+            }} 
+            className="space-y-4"
+          >
+            <div className="space-y-1">
+              <Label>Activity Type *</Label>
+              <Select value={newShiftData.activityType} onValueChange={(v) => setNewShiftData({ ...newShiftData, activityType: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ACTIVITY_TYPES.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Start Date & Time *</Label>
+                <Input 
+                  type="datetime-local" 
+                  required 
+                  value={newShiftData.startDate} 
+                  onChange={e => setNewShiftData({ ...newShiftData, startDate: e.target.value })} 
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>End Date & Time *</Label>
+                <Input 
+                  type="datetime-local" 
+                  required 
+                  value={newShiftData.endDate} 
+                  onChange={e => setNewShiftData({ ...newShiftData, endDate: e.target.value })} 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Location</Label>
+              <Input 
+                value={newShiftData.location} 
+                onChange={e => setNewShiftData({ ...newShiftData, location: e.target.value })} 
+                placeholder="e.g. Temple Hall" 
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Capacity (max volunteers)</Label>
+              <Input 
+                type="number" 
+                min="1" 
+                value={newShiftData.capacity} 
+                onChange={e => setNewShiftData({ ...newShiftData, capacity: parseInt(e.target.value) })} 
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Description</Label>
+              <Textarea 
+                value={newShiftData.description} 
+                onChange={e => setNewShiftData({ ...newShiftData, description: e.target.value })} 
+                placeholder="Add special instructions for volunteers..." 
+                rows={2}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setIsShiftFormOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={createShiftMutation.isPending} className="bg-gradient-to-r from-primary to-secondary font-bold">
+                {createShiftMutation.isPending ? "Creating..." : "Create Shift"}
               </Button>
             </div>
           </form>

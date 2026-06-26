@@ -133,6 +133,8 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     if (dbUser) {
       user.role = dbUser.role;
       user.isAdmin = dbUser.role === "admin" || dbUser.role === "super-admin";
+      user.isLeader = dbUser.role === "leader" || dbUser.role === "admin" || dbUser.role === "super-admin";
+      user.isSuperAdmin = dbUser.role === "super-admin";
       user.claims = user.claims || { sub: dbUser.id, email: dbUser.email };
       user.approvalStatus = dbUser.approvalStatus;
 
@@ -148,6 +150,18 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   return next();
 };
 
+export const requireSuperAdmin: RequestHandler = async (req, res, next) => {
+  const user = req.user as any;
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  const dbUser = await storage.getUser(user.claims?.sub || user.id);
+  if (!dbUser || dbUser.role !== "super-admin") {
+    return res.status(403).json({ message: "Super-Admin access required" });
+  }
+  return next();
+};
+
 export const requireAdmin: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
   if (!req.isAuthenticated()) {
@@ -156,6 +170,19 @@ export const requireAdmin: RequestHandler = async (req, res, next) => {
   const dbUser = await storage.getUser(user.claims?.sub || user.id);
   if (!dbUser || (dbUser.role !== "admin" && dbUser.role !== "super-admin")) {
     return res.status(403).json({ message: "Admin access required" });
+  }
+  return next();
+};
+
+// Allows super-admin, admin, and leader roles
+export const requireLeader: RequestHandler = async (req, res, next) => {
+  const user = req.user as any;
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  const dbUser = await storage.getUser(user.claims?.sub || user.id);
+  if (!dbUser || (dbUser.role !== "leader" && dbUser.role !== "admin" && dbUser.role !== "super-admin")) {
+    return res.status(403).json({ message: "Leader access required" });
   }
   return next();
 };

@@ -17,7 +17,7 @@ import {
   CalendarDays, HandHeart, BarChart3, Settings, CreditCard,
   LogOut, Code2, Layers, Sparkles, ChevronDown, ChevronRight,
   Plus, Users2, Globe, BookOpen, Landmark, MapPin, Bell, Leaf, Mountain, X,
-  FileText, Vote, Trophy, MessageSquare, Database
+  FileText, Vote, Trophy, MessageSquare, Database, Shield
 } from "lucide-react";
 
 const ICON_MAP: Record<string, any> = {
@@ -59,18 +59,18 @@ const FLAG_TO_NAV_ID: Record<string, string> = {
   groups: "groups",
 };
 
-// A small palette of colours cycled across group items
+// M3 Expressive color palette for group avatars
 const GROUP_COLORS = [
-  "text-orange-500 bg-orange-500/10",
-  "text-blue-500 bg-blue-500/10",
-  "text-purple-500 bg-purple-500/10",
-  "text-green-500 bg-green-500/10",
-  "text-pink-500 bg-pink-500/10",
-  "text-yellow-500 bg-yellow-500/10",
-  "text-cyan-500 bg-cyan-500/10",
-  "text-red-500 bg-red-500/10",
-  "text-indigo-500 bg-indigo-500/10",
-  "text-teal-500 bg-teal-500/10",
+  { bg: "bg-orange-500/15", text: "text-orange-600", ring: "ring-orange-400/30" },
+  { bg: "bg-violet-500/15", text: "text-violet-600", ring: "ring-violet-400/30" },
+  { bg: "bg-sky-500/15", text: "text-sky-600", ring: "ring-sky-400/30" },
+  { bg: "bg-emerald-500/15", text: "text-emerald-600", ring: "ring-emerald-400/30" },
+  { bg: "bg-rose-500/15", text: "text-rose-600", ring: "ring-rose-400/30" },
+  { bg: "bg-amber-500/15", text: "text-amber-600", ring: "ring-amber-400/30" },
+  { bg: "bg-cyan-500/15", text: "text-cyan-600", ring: "ring-cyan-400/30" },
+  { bg: "bg-pink-500/15", text: "text-pink-600", ring: "ring-pink-400/30" },
+  { bg: "bg-indigo-500/15", text: "text-indigo-600", ring: "ring-indigo-400/30" },
+  { bg: "bg-teal-500/15", text: "text-teal-600", ring: "ring-teal-400/30" },
 ];
 
 function groupInitials(name: string) {
@@ -122,16 +122,20 @@ function AddGroupDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-sm rounded-3xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Users2 className="w-5 h-5 text-primary" />
+          <DialogTitle className="flex items-center gap-3">
+            <span className="w-8 h-8 m3-icon-tonal flex items-center justify-center rounded-xl">
+              <Users2 className="w-4 h-4" />
+            </span>
             Add New Group
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-3 mt-1">
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Group Name *</label>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
+              Group Name *
+            </label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -141,8 +145,10 @@ function AddGroupDialog({
               data-testid="input-group-name"
             />
           </div>
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Description</label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
+              Description
+            </label>
             <Input
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
@@ -171,7 +177,7 @@ function AddGroupDialog({
 
 export function Sidebar() {
   const [location] = useLocation();
-  const { user, isAdmin, canSeePage } = useAuth();
+  const { user, isAdmin, isLeader, isSuperAdmin, canSeePage } = useAuth();
   const { isDevMode, showDevLogin, deactivateDevMode } = useDevMode();
   const [groupsOpen, setGroupsOpen] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
@@ -221,93 +227,107 @@ export function Sidebar() {
         )?.[0];
         if (!flagKey) return true;
         if (featureFlags[flagKey] === false) return false;
-        // Role-based filtering
-        if (!isAdmin && ADMIN_ONLY_PAGES.includes(item.id)) return false;
+        if (!isAdmin && !isLeader && ADMIN_ONLY_PAGES.includes(item.id)) return false;
         if (!isAdmin && !canSeePage(item.id)) return false;
         return true;
       })
     : rawNavItems.filter((item) => {
-        if (!isAdmin && ADMIN_ONLY_PAGES.includes(item.id)) return false;
+        if (!isAdmin && !isLeader && ADMIN_ONLY_PAGES.includes(item.id)) return false;
         if (!isAdmin && !canSeePage(item.id)) return false;
         return true;
       });
 
-  const getNavItemClass = (href: string) => {
-    const isActive = location === href;
-    const base =
-      "flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-all duration-200";
-    return isActive
-      ? `${base} bg-primary/10 text-primary font-medium`
-      : `${base} text-muted-foreground hover:bg-muted hover:text-foreground`;
-  };
+  const isActive = (href: string) => location === href;
 
   return (
-    <div className="w-64 bg-card border-r border-border flex flex-col h-full">
-      {/* Header */}
-      <div className="p-5 border-b border-border">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center flex-shrink-0">
-            <span className="text-primary-foreground text-lg font-bold">
+    <div className="w-64 flex flex-col h-full border-r border-border/60 bg-[var(--surface-container,var(--card))]">
+
+      {/* ── Logo / App Header ── */}
+      <div className="p-5 pb-4">
+        <div className="flex items-center gap-3">
+          {/* M3 Expressive logo container */}
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center flex-shrink-0 shadow-elevation-2">
+            <span className="text-primary-foreground text-lg font-black select-none">
               {appInfo.logoSymbol || "॥"}
             </span>
           </div>
           <div className="min-w-0">
-            <h1 className="text-base font-bold text-foreground break-words leading-tight">
+            <h1 className="text-base font-extrabold text-foreground leading-tight tracking-tight">
               {appInfo.name}
             </h1>
-            <p className="text-xs text-muted-foreground break-words leading-tight mt-0.5">
+            <p className="text-[11px] text-muted-foreground leading-tight mt-0.5 font-medium">
               {appInfo.subtitle}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Theme Selector */}
-      <div className="p-4 border-b border-border">
+      {/* ── Theme Selector ── */}
+      <div className="px-4 pb-3">
         <ThemeSelector />
       </div>
 
-      {/* Navigation + Groups — scrollable together */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {/* Main nav items */}
-        {navItems.map((item: any) => {
+      {/* ── Navigation ── */}
+      <nav className="flex-1 px-3 pb-3 space-y-0.5 overflow-y-auto">
+
+        {navItems.map((item: any, idx: number) => {
           const Icon = ICON_MAP[item.icon] || Home;
+          const active = isActive(item.href);
           return (
             <Link key={item.id || item.href} href={item.href}>
               <div
-                className={getNavItemClass(item.href)}
+                className={[
+                  "flex items-center gap-3 px-3 py-2.5 rounded-full cursor-pointer transition-all duration-200",
+                  "animate-fade-in",
+                  active
+                    ? "bg-primary/12 text-primary font-bold"
+                    : "text-muted-foreground hover:bg-foreground/6 hover:text-foreground font-medium"
+                ].join(" ")}
+                style={{ animationDelay: `${idx * 0.03}s` }}
                 data-testid={`nav-link-${item.id || item.href.replace(/\//g, "")}`}
               >
-                <Icon className="w-5 h-5 flex-shrink-0" />
-                <span className="break-words min-w-0">{!isAdmin && item.id === "dashboard" ? "Devotee Portal" : item.name}</span>
+                {/* M3 icon container — filled-tonal on active, ghost on inactive */}
+                <div className={[
+                  "w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-200",
+                  active
+                    ? "bg-primary/20 text-primary scale-105"
+                    : "text-muted-foreground"
+                ].join(" ")}>
+                  <Icon className="w-4 h-4" />
+                </div>
+                <span className="text-sm leading-tight">
+                  {!isAdmin && item.id === "dashboard" ? "Devotee Portal" : item.name}
+                </span>
+                {/* Active indicator dot */}
+                {active && (
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                )}
               </div>
             </Link>
           );
         })}
 
         {/* ── GROUPS SECTION ── */}
-        <div className="pt-3">
-          {/* Section header */}
-          <div className="flex items-center justify-between px-1 mb-1">
+        <div className="pt-4">
+          {/* Section header — M3 label style */}
+          <div className="flex items-center justify-between px-3 mb-2">
             <button
               onClick={() => setGroupsOpen((v) => !v)}
-              className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 hover:text-muted-foreground transition-colors"
+              className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 hover:text-muted-foreground transition-colors"
               data-testid="button-toggle-groups"
             >
-              {groupsOpen ? (
-                <ChevronDown className="w-3 h-3" />
-              ) : (
+              <div className={`transition-transform duration-200 ${groupsOpen ? "rotate-90" : ""}`}>
                 <ChevronRight className="w-3 h-3" />
-              )}
+              </div>
               Groups
-              <span className="ml-1 text-[10px] bg-muted text-muted-foreground rounded-full px-1.5 py-0 font-normal">
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground text-[9px] font-bold">
                 {groupsData.length}
               </span>
             </button>
             <button
               onClick={() => setAddOpen(true)}
               title="Add new group"
-              className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+              className="w-6 h-6 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200"
               data-testid="button-add-group"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -318,64 +338,73 @@ export function Sidebar() {
           {groupsOpen && (
             <div className="space-y-0.5">
               {groupsData.length === 0 && (
-                <p className="text-xs text-muted-foreground/50 px-4 py-2 italic">
+                <p className="text-xs text-muted-foreground/40 px-4 py-2 italic text-center">
                   No groups yet
                 </p>
               )}
               {groupsData.map((group, idx) => {
-                const colorClass = GROUP_COLORS[idx % GROUP_COLORS.length];
+                const colors = GROUP_COLORS[idx % GROUP_COLORS.length];
                 const initials = groupInitials(group.groupName);
                 return (
                   <div
                     key={group.id}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-muted transition-colors cursor-pointer group"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-full hover:bg-foreground/6 transition-colors cursor-pointer group"
                     title={group.description || group.groupName}
                     data-testid={`nav-group-${group.id}`}
                   >
-                    {/* Avatar bubble */}
-                    <div
-                      className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${colorClass}`}
-                    >
+                    {/* M3 avatar bubble */}
+                    <div className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 text-[10px] font-black ring-1 ${colors.bg} ${colors.text} ${colors.ring}`}>
                       {initials}
                     </div>
-                    <span className="text-sm text-muted-foreground group-hover:text-foreground leading-tight min-w-0 break-words transition-colors">
+                    <span className="text-xs text-muted-foreground group-hover:text-foreground leading-tight min-w-0 break-words transition-colors font-medium">
                       {group.groupName}
                     </span>
                   </div>
                 );
               })}
 
-              {/* Always-visible Add button at the bottom of list */}
+              {/* Add group inline button */}
               <button
                 onClick={() => setAddOpen(true)}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-lg w-full text-left hover:bg-muted transition-colors text-muted-foreground/60 hover:text-muted-foreground"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-full w-full text-left hover:bg-foreground/6 transition-colors text-muted-foreground/50 hover:text-muted-foreground"
                 data-testid="button-add-group-inline"
               >
-                <div className="w-7 h-7 rounded-md border-2 border-dashed border-muted-foreground/25 flex items-center justify-center flex-shrink-0">
+                <div className="w-7 h-7 rounded-xl border-2 border-dashed border-muted-foreground/20 flex items-center justify-center flex-shrink-0">
                   <Plus className="w-3.5 h-3.5" />
                 </div>
-                <span className="text-xs">Add a group…</span>
+                <span className="text-xs font-medium">Add a group…</span>
               </button>
             </div>
           )}
         </div>
 
-        {/* Dynamic pages */}
+        {/* ── Dynamic pages ── */}
         {dynamicPages.length > 0 && (
           <>
-            <div className="pt-2 pb-1">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-4">
-                Dynamic Pages
+            <div className="pt-4 pb-1">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 px-3">
+                Custom Pages
               </p>
             </div>
             {dynamicPages.map((page: any) => {
               const href = `/page/${page.slug}`;
               const Icon = ICON_MAP[page.icon] || FileText;
+              const active = isActive(href);
               return (
                 <Link key={page.id} href={href}>
-                  <div className={getNavItemClass(href)} data-testid={`nav-link-dynamic-${page.slug}`}>
-                    <Icon className="w-5 h-5 flex-shrink-0" />
-                    <span className="break-words min-w-0">{page.label}</span>
+                  <div
+                    className={[
+                      "flex items-center gap-3 px-3 py-2.5 rounded-full cursor-pointer transition-all duration-200",
+                      active
+                        ? "bg-primary/12 text-primary font-bold"
+                        : "text-muted-foreground hover:bg-foreground/6 hover:text-foreground font-medium"
+                    ].join(" ")}
+                    data-testid={`nav-link-dynamic-${page.slug}`}
+                  >
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? "bg-primary/20 text-primary" : "text-muted-foreground"}`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <span className="text-sm leading-tight">{page.label}</span>
                   </div>
                 </Link>
               );
@@ -383,81 +412,86 @@ export function Sidebar() {
           </>
         )}
 
-        {/* Dev Studio link – only in dev mode */}
+        {/* ── Dev Studio ── */}
         {isDevMode && (
           <>
-            <div className="pt-2 pb-1">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-4">
+            <div className="pt-4 pb-1">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 px-3">
                 Developer
               </p>
             </div>
             <Link href="/dev-studio">
               <div
-                className={getNavItemClass("/dev-studio")}
+                className={[
+                  "flex items-center gap-3 px-3 py-2.5 rounded-full cursor-pointer transition-all duration-200",
+                  isActive("/dev-studio")
+                    ? "bg-amber-500/12 text-amber-600 font-bold"
+                    : "text-amber-600/70 hover:bg-amber-500/8 hover:text-amber-600 font-medium"
+                ].join(" ")}
                 data-testid="nav-link-dev-studio"
               >
-                <Code2 className="w-5 h-5 flex-shrink-0 text-yellow-500" />
-                <span className="break-words min-w-0 text-yellow-600 dark:text-yellow-400 font-medium">
-                  Dev Studio
-                </span>
+                <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-600 flex items-center justify-center flex-shrink-0">
+                  <Code2 className="w-4 h-4" />
+                </div>
+                <span className="text-sm leading-tight">Dev Studio</span>
               </div>
             </Link>
           </>
         )}
       </nav>
 
-      {/* Developer Mode Toggle — admin only */}
-      {isAdmin && (
-        <div className="px-4 pb-3">
+      {/* ── Dev Mode Toggle ── */}
+      {isSuperAdmin && (
+        <div className="px-3 pb-2">
           {isDevMode ? (
             <Button
               variant="outline"
               size="sm"
-              className="w-full border-yellow-400 text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
+              className="w-full rounded-full border-amber-400/40 text-amber-600 hover:bg-amber-500/10 hover:border-amber-400 text-xs"
               onClick={deactivateDevMode}
               data-testid="button-exit-dev-mode"
             >
-              <Code2 className="w-4 h-4 mr-2" />
+              <Code2 className="w-3.5 h-3.5" />
               Exit Dev Mode
             </Button>
           ) : (
             <Button
               variant="ghost"
               size="sm"
-              className="w-full text-muted-foreground hover:text-foreground"
+              className="w-full rounded-full text-muted-foreground/60 hover:text-muted-foreground text-xs"
               onClick={showDevLogin}
               data-testid="button-enter-dev-mode"
             >
-              <Code2 className="w-4 h-4 mr-2" />
+              <Code2 className="w-3.5 h-3.5" />
               Developer Mode
             </Button>
           )}
         </div>
       )}
 
-      {/* User Profile */}
-      <div className="p-4 border-t border-border">
-        <div className="flex items-center space-x-3">
-          <Avatar className="w-10 h-10">
+      {/* ── User Profile ── */}
+      <div className="p-3 border-t border-border/50 bg-[var(--surface-container,var(--muted))/30]">
+        <div className="flex items-center gap-3 p-2 rounded-2xl hover:bg-foreground/5 transition-colors">
+          <Avatar className="w-9 h-9 ring-2 ring-primary/20 flex-shrink-0">
             <AvatarImage src={user?.profileImageUrl || undefined} alt={user?.firstName || undefined} />
-            <AvatarFallback>
+            <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-primary-foreground text-xs font-black">
               {user?.firstName?.[0]}
               {user?.lastName?.[0]}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground break-words leading-tight">
+            <p className="text-sm font-bold text-foreground truncate leading-tight">
               {user?.firstName} {user?.lastName}
             </p>
-            <Badge variant="secondary" className="text-xs mt-0.5">
+            <Badge variant="tonal" className="text-[10px] px-2 py-0 mt-0.5 h-4">
               {user?.role}
             </Badge>
           </div>
           <Button
             variant="ghost"
-            size="sm"
+            size="icon-sm"
             onClick={() => (window.location.href = "/api/logout")}
-            className="text-muted-foreground hover:text-foreground flex-shrink-0"
+            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
             data-testid="button-logout"
           >
             <LogOut className="w-4 h-4" />

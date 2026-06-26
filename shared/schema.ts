@@ -179,6 +179,19 @@ export const eventParticipation = pgTable("event_participation", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Volunteering Shifts storage table
+export const volunteeringShifts = pgTable("volunteering_shifts", {
+  id: serial("id").primaryKey(),
+  activityType: varchar("activity_type").notNull(),
+  description: text("description"),
+  location: varchar("location"),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  capacity: integer("capacity").notNull().default(5),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Volunteering storage table
 export const volunteering = pgTable("volunteering", {
   id: serial("id").primaryKey(),
@@ -194,6 +207,7 @@ export const volunteering = pgTable("volunteering", {
   status: varchar("status").notNull().default("active"),
   supervisorId: integer("supervisor_id"),
   feedback: text("feedback"),
+  shiftId: integer("shift_id").references(() => volunteeringShifts.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -463,6 +477,14 @@ export const volunteeringRelations = relations(volunteering, ({ one }) => ({
     fields: [volunteering.devoteeId],
     references: [devotees.id],
   }),
+  shift: one(volunteeringShifts, {
+    fields: [volunteering.shiftId],
+    references: [volunteeringShifts.id],
+  }),
+}));
+
+export const volunteeringShiftsRelations = relations(volunteeringShifts, ({ many }) => ({
+  signups: many(volunteering),
 }));
 
 export const groupsRelations = relations(groups, ({ one, many }) => ({
@@ -722,6 +744,11 @@ export const insertVolunteeringSchema = createInsertSchema(volunteering).omit({
   createdAt: true,
 });
 
+export const insertVolunteeringShiftSchema = createInsertSchema(volunteeringShifts).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertGroupSchema = createInsertSchema(groups).omit({
   id: true,
   createdAt: true,
@@ -919,6 +946,9 @@ export type Event = typeof events.$inferSelect;
 
 export type InsertVolunteering = z.infer<typeof insertVolunteeringSchema>;
 export type Volunteering = typeof volunteering.$inferSelect;
+
+export type InsertVolunteeringShift = z.infer<typeof insertVolunteeringShiftSchema>;
+export type VolunteeringShift = typeof volunteeringShifts.$inferSelect;
 
 export type InsertGroup = z.infer<typeof insertGroupSchema>;
 export type Group = typeof groups.$inferSelect;

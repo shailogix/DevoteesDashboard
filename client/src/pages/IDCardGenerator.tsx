@@ -94,7 +94,7 @@ export default function IDCardGenerator() {
     showEvent: false,
     orgName: "Madhav Parivar",
     cardTitle: "Devotee ID Card",
-    customMessage: "Jai Shri Krishna • Jay Gurudev",
+    customMessage: localStorage.getItem("devotional_greeting") || "Jai Shree Madhav 🙏🏻",
     cardSize: "credit",
     useSpiritualColor: false,
     event: null,

@@ -160,7 +160,7 @@ export function UpcomingEvents() {
           const bgImg = event.imageUrl || EVENT_IMAGES[event.eventType] || EVENT_IMAGES.fallback;
 
           return (
-            <Card key={event.id} className="overflow-hidden border-primary/10 hover:border-primary/30 shadow-sm hover:shadow-md transition-all flex flex-col group h-full">
+            <Card key={event.id} className="overflow-hidden border-primary/10 hover:border-primary/30 shadow-sm hover:shadow-elevation-3 transition-all duration-300 flex flex-col group h-full rounded-3xl">
               {/* Event Image Banner */}
               <div className="h-40 w-full relative overflow-hidden bg-muted">
                 <img 
@@ -168,16 +168,26 @@ export function UpcomingEvents() {
                   alt={event.title} 
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                 
-                {/* Event Type Badge */}
-                <Badge className={`absolute top-3 left-3 capitalize border ${EVENT_TYPE_COLORS[event.eventType] || "bg-muted text-muted-foreground"}`}>
-                  {event.eventType}
-                </Badge>
+                {/* Event Type Badge — theme aware M3 Chips */}
+                <div className="absolute top-3 left-3">
+                  <Badge 
+                    variant={
+                      event.eventType === "festival" ? "warning" :
+                      event.eventType === "satsang" ? "tonal" :
+                      event.eventType === "workshop" ? "info" :
+                      event.eventType === "meeting" ? "success" : "default"
+                    }
+                    className="capitalize border-0 font-bold"
+                  >
+                    {event.eventType}
+                  </Badge>
+                </div>
                 
                 {/* Days Until overlay */}
-                <div className={`absolute top-3 right-3 text-xs font-bold px-2.5 py-1 rounded-full text-white shadow-sm ${
-                  days === "Today" ? "bg-red-600" :
+                <div className={`absolute top-3 right-3 text-[11px] font-extrabold px-3 py-1 rounded-full text-white shadow-elevation-1 transition-all ${
+                  days === "Today" ? "bg-red-600 animate-pulse" :
                   days === "Tomorrow" ? "bg-orange-500" :
                   "bg-amber-500"
                 }`}>

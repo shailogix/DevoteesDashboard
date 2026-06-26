@@ -68,6 +68,39 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
 
   if (isLoading) {
     return (
+      <div className="min-h-screen flex items-center justify-center bg-background particle-bg">
+        <div className="text-center space-y-5 animate-fade-in-up">
+          <div className="relative inline-flex">
+            <div className="absolute inset-0 rounded-3xl bg-primary/20 blur-xl" />
+            <div className="relative w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center shadow-elevation-3 animate-spring-pop">
+              <span className="text-primary-foreground text-2xl font-black">॥</span>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Madhav Parivar</h1>
+            <p className="text-muted-foreground text-sm font-medium">Loading…</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) return null;
+  return <Component />;
+}
+
+function SuperAdminRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isSuperAdmin, isLoading } = useAuth();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && !isSuperAdmin) {
+      navigate("/");
+    }
+  }, [isLoading, isSuperAdmin, navigate]);
+
+  if (isLoading) {
+    return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center mx-auto animate-pulse">
@@ -82,9 +115,40 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
     );
   }
 
-  if (!isAdmin) return null;
+  if (!isSuperAdmin) return null;
   return <Component />;
 }
+
+function LeaderRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isLeader, isLoading } = useAuth();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && !isLeader) {
+      navigate("/");
+    }
+  }, [isLoading, isLeader, navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center mx-auto animate-pulse">
+            <span className="text-primary-foreground text-2xl font-bold">॥</span>
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold text-foreground">Madhav Parivar</h1>
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isLeader) return null;
+  return <Component />;
+}
+
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -129,71 +193,81 @@ function PendingApprovalScreen({ logout }: { logout: () => void }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-tr from-amber-50/20 via-background to-orange-50/20 p-4">
-      <div className="max-w-md w-full space-y-8 p-8 bg-card border border-border/80 rounded-2xl shadow-xl backdrop-blur-sm relative overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500"></div>
-        
-        <div className="text-center space-y-4">
-          <div className="w-20 h-20 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-amber-500/20 animate-pulse">
-            <span className="text-white text-3xl font-bold font-serif">॥</span>
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-black text-foreground tracking-tight">Account Awaiting Approval</h1>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-              Your devotee registration has been submitted and is currently pending administrator verification.
-            </p>
-          </div>
-        </div>
+    <div className="min-h-screen flex items-center justify-center bg-background particle-bg p-4">
+      {/* Ambient glows */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/8 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-orange-500/8 rounded-full blur-3xl" />
+      </div>
 
-        <form onSubmit={handleVerify} className="space-y-4 bg-muted/40 p-5 rounded-xl border border-border/40">
-          <div className="space-y-1 text-center">
-            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-              Have an Activation Code?
-            </label>
-            <p className="text-xs text-muted-foreground">Enter the 7-digit code provided by your admin</p>
-          </div>
-          
-          <input
-            type="text"
-            maxLength={7}
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-            placeholder="0000000"
-            className="w-full text-center tracking-[0.5em] text-xl font-bold py-3 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-amber-500"
-          />
+      <div className="relative max-w-md w-full animate-fade-in-up">
+        <div className="rounded-3xl border border-border/50 bg-[var(--surface-container-high,var(--card))] shadow-elevation-4 overflow-hidden">
+          {/* M3 gradient accent bar */}
+          <div className="h-1.5 bg-gradient-to-r from-amber-500 via-orange-400 to-yellow-400" />
 
-          {error && (
-            <div className="text-xs text-destructive flex items-center justify-center gap-1">
-              <AlertCircle className="w-3.5 h-3.5" />
-              <span>{error}</span>
+          <div className="p-8 space-y-7">
+            {/* Logo */}
+            <div className="text-center space-y-4">
+              <div className="relative inline-flex items-center justify-center">
+                <div className="absolute w-20 h-20 rounded-full bg-amber-500/10 animate-ping" style={{ animationDuration: '3s' }} />
+                <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-elevation-3 animate-spring-pop">
+                  <span className="text-white text-3xl font-black">॥</span>
+                </div>
+              </div>
+              <div>
+                <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Account Awaiting Approval</h1>
+                <p className="text-sm text-muted-foreground mt-2 leading-relaxed max-w-xs mx-auto">
+                  Your devotee registration is pending administrator verification.
+                </p>
+              </div>
             </div>
-          )}
 
-          {success && (
-            <div className="text-xs text-green-600 font-medium text-center">
-              {success}
+            {/* Activation code form */}
+            <div className="rounded-2xl bg-muted/40 p-5 border border-border/40 space-y-4">
+              <div className="text-center space-y-1">
+                <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">Have an Activation Code?</p>
+                <p className="text-xs text-muted-foreground">Enter the 7-digit code from your admin</p>
+              </div>
+
+              <form onSubmit={handleVerify} className="space-y-3">
+                <input
+                  type="text"
+                  maxLength={7}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="0000000"
+                  className="w-full text-center tracking-[0.5em] text-xl font-black py-3.5 rounded-xl border-0 border-b-2 border-border/60 bg-muted/60 focus:outline-none focus:border-amber-500 focus:bg-muted/80 transition-all"
+                />
+
+                {error && (
+                  <div className="text-xs text-destructive flex items-center justify-center gap-1.5 font-semibold">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                {success && (
+                  <div className="text-xs text-emerald-600 font-bold text-center">{success}</div>
+                )}
+
+                <Button
+                  type="submit"
+                  disabled={verifying || code.length !== 7}
+                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold rounded-full border-0 shadow-elevation-2 hover:shadow-elevation-3"
+                >
+                  {verifying ? "Activating…" : "Verify Code"}
+                </Button>
+              </form>
             </div>
-          )}
 
-          <Button
-            type="submit"
-            disabled={verifying || code.length !== 7}
-            className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium shadow-md shadow-orange-500/10"
-          >
-            {verifying ? "Activating..." : "Verify Code"}
-          </Button>
-        </form>
-
-        <div className="pt-2 flex items-center justify-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={logout}
-            className="text-muted-foreground hover:text-foreground text-xs"
-          >
-            <LogOut className="w-3.5 h-3.5 mr-1.5" />
-            Logout & Sign In with Another Account
-          </Button>
+            {/* Logout */}
+            <div className="flex justify-center">
+              <Button variant="ghost" size="sm" onClick={logout} className="text-muted-foreground hover:text-foreground text-xs rounded-full">
+                <LogOut className="w-3.5 h-3.5" />
+                Logout &amp; Sign In with Another Account
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -201,7 +275,7 @@ function PendingApprovalScreen({ logout }: { logout: () => void }) {
 }
 
 function AppContent() {
-  const { isAuthenticated, isLoading, isAdmin, isApproved, logout } = useAuth();
+  const { isAuthenticated, isLoading, isAdmin, isLeader, isSuperAdmin, isApproved, logout, isViewingAsDevotee } = useAuth();
   const { isDevMode } = useDevMode();
 
   if (isLoading) {
@@ -230,22 +304,61 @@ function AppContent() {
 
   return (
     <div className={`h-screen flex bg-background flex-col ${isDevMode ? 'pt-7' : ''}`}>
+      {isViewingAsDevotee && (
+        <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold px-5 py-2.5 flex items-center justify-between z-50 shadow-elevation-2">
+          <span className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+            Previewing Devotee User Portal
+          </span>
+          <button
+            onClick={() => {
+              localStorage.removeItem("view_as_role");
+              window.location.reload();
+            }}
+            className="px-3 py-1 rounded-full bg-white/20 hover:bg-white/30 font-bold transition-colors text-xs ml-2"
+          >
+            ← Back to Admin Portal
+          </button>
+        </div>
+      )}
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden">
           <Switch>
-            <Route path="/" component={isAdmin ? Dashboard : DevoteeDashboard} />
-            <Route path="/devotees" component={Devotees} />
-            <Route path="/families" component={Families} />
-            <Route path="/mentors" component={Mentors} />
-            <Route path="/attendance" component={Attendance} />
-            <Route path="/donations" component={Donations} />
-            <Route path="/events" component={Events} />
-            <Route path="/volunteering" component={Volunteering} />
-            <Route path="/analytics" component={Analytics} />
-            <Route path="/mandals" component={Mandals} />
-            <Route path="/sabha-locations" component={SabhaLocations} />
-            <Route path="/groups" component={Groups} />
+            <Route path="/" component={(isAdmin || isLeader) ? Dashboard : DevoteeDashboard} />
+            <Route path="/devotees">
+              <LeaderRoute component={Devotees} />
+            </Route>
+            <Route path="/families">
+              <AdminRoute component={Families} />
+            </Route>
+            <Route path="/mentors">
+              <LeaderRoute component={Mentors} />
+            </Route>
+            <Route path="/attendance">
+              <LeaderRoute component={Attendance} />
+            </Route>
+            <Route path="/donations">
+              <AdminRoute component={Donations} />
+            </Route>
+            <Route path="/events">
+              <LeaderRoute component={Events} />
+            </Route>
+            <Route path="/volunteering">
+              <LeaderRoute component={Volunteering} />
+            </Route>
+            <Route path="/analytics">
+              <AdminRoute component={Analytics} />
+            </Route>
+            <Route path="/mandals">
+              <AdminRoute component={Mandals} />
+            </Route>
+            <Route path="/sabha-locations">
+              <AdminRoute component={SabhaLocations} />
+            </Route>
+            <Route path="/groups">
+              <LeaderRoute component={Groups} />
+            </Route>
             <Route path="/notifications" component={Notifications} />
             <Route path="/devotee-dashboard" component={DevoteeDashboard} />
             <Route path="/polls-quizzes" component={PollsQuizzes} />
@@ -253,22 +366,34 @@ function AppContent() {
             <Route path="/import-data">
               <AdminRoute component={ImportData} />
             </Route>
-            <Route path="/dashboard-designer" component={DashboardDesigner} />
-            <Route path="/dev-studio">
-              <AdminRoute component={DevStudio} />
+            <Route path="/dashboard-designer">
+              <SuperAdminRoute component={DashboardDesigner} />
             </Route>
-            <Route path="/devotees/:id" component={DevoteeProfilePage} />
-            <Route path="/events/:id" component={EventDetailPage} />
-            <Route path="/families/:id" component={FamilyDetailPage} />
-            <Route path="/id-cards" component={IDCardGenerator} />
-            <Route path="/settings" component={Settings} />
+            <Route path="/dev-studio">
+              <SuperAdminRoute component={DevStudio} />
+            </Route>
+            <Route path="/devotees/:id">
+              <LeaderRoute component={DevoteeProfilePage} />
+            </Route>
+            <Route path="/events/:id">
+              <LeaderRoute component={EventDetailPage} />
+            </Route>
+            <Route path="/families/:id">
+              <AdminRoute component={FamilyDetailPage} />
+            </Route>
+            <Route path="/id-cards">
+              <AdminRoute component={IDCardGenerator} />
+            </Route>
+            <Route path="/settings">
+              <AdminRoute component={Settings} />
+            </Route>
             <Route path="/page/:slug" component={DynamicPage} />
             <Route component={NotFound} />
           </Switch>
         </div>
       </div>
-      <EditModeCursor />
-      <GodModeEditorPanel />
+      {isSuperAdmin && <EditModeCursor />}
+      {isSuperAdmin && <GodModeEditorPanel />}
     </div>
   );
 }

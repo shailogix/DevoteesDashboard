@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Header } from "@/components/Layout/Header";
 import { LoadingSpinner } from "@/components/Common/LoadingSpinner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, Legend
@@ -51,6 +53,7 @@ interface DonationSummary {
 
 export default function Analytics() {
   const [, navigate] = useLocation();
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const { data: analyticsRaw, isLoading } = useQuery<AnalyticsData>({ queryKey: ["/api/analytics"] });
   const { data: devotees = [] } = useQuery<DevoteeSummary[]>({ queryKey: ["/api/devotees"] });
   const { data: events = [] } = useQuery<EventSummary[]>({ queryKey: ["/api/events"] });
@@ -147,8 +150,19 @@ export default function Analytics() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <LoadingSpinner size="lg" text="Loading analytics..." />
+      <div className="flex-1 flex items-center justify-center bg-background particle-bg">
+        <div className="text-center space-y-5 animate-fade-in-up">
+          <div className="relative inline-flex">
+            <div className="absolute inset-0 rounded-3xl bg-primary/20 blur-xl animate-pulse" />
+            <div className="relative w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center shadow-elevation-3 animate-spring-pop">
+              <span className="text-primary-foreground text-2xl font-black">॥</span>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Madhav Parivar</h1>
+            <p className="text-muted-foreground text-sm font-medium">Loading Analytics Insights…</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -156,19 +170,77 @@ export default function Analytics() {
   const totalDonationSum = donations.reduce((s, d) => s + parseFloat(d.amount || "0"), 0);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden bg-background">
       <Header 
         title="Analytics" 
         subtitle="Insights and reports for your organization"
       />
       
       <main className="flex-1 overflow-y-auto p-6 space-y-6">
-        {/* Key Metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card><CardContent className="pt-5 pb-4"><div className="flex items-center gap-3"><Users className="w-8 h-8 text-blue-600" /><div><p className="text-2xl font-bold">{stats?.totalDevotees || (devotees as any[]).length}</p><p className="text-xs text-muted-foreground">Total Devotees</p></div></div></CardContent></Card>
-          <Card><CardContent className="pt-5 pb-4"><div className="flex items-center gap-3"><Heart className="w-8 h-8 text-red-500" /><div><p className="text-2xl font-bold">₹{totalDonationSum.toLocaleString('en-IN')}</p><p className="text-xs text-muted-foreground">Total Donations</p></div></div></CardContent></Card>
-          <Card><CardContent className="pt-5 pb-4"><div className="flex items-center gap-3"><Activity className="w-8 h-8 text-purple-600" /><div><p className="text-2xl font-bold">{stats?.avgAttendance || 0}%</p><p className="text-xs text-muted-foreground">Avg Attendance</p></div></div></CardContent></Card>
-          <Card><CardContent className="pt-5 pb-4"><div className="flex items-center gap-3"><Calendar className="w-8 h-8 text-green-600" /><div><p className="text-2xl font-bold">{stats?.activeFamilies || (families as any[]).length}</p><p className="text-xs text-muted-foreground">Active Families</p></div></div></CardContent></Card>
+        {/* Export Action */}
+        <div className="flex justify-end print:hidden">
+          <Button onClick={() => setIsPrintModalOpen(true)} className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold flex items-center gap-2 rounded-full shadow-elevation-1 hover:shadow-elevation-2">
+            <Download className="w-4 h-4" /> Export Operational PDF Report
+          </Button>
+        </div>
+
+        {/* Key Metrics — M3 Expressive Swatch Panel */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
+          <Card className="hover:shadow-elevation-2 hover:-translate-y-1 transition-all duration-300 rounded-3xl border-border/40">
+            <CardContent className="pt-6 pb-5">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center flex-shrink-0">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-3xl font-extrabold text-foreground tracking-tight">{stats?.totalDevotees || (devotees as any[]).length}</p>
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">Total Devotees</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="hover:shadow-elevation-2 hover:-translate-y-1 transition-all duration-300 rounded-3xl border-border/40">
+            <CardContent className="pt-6 pb-5">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center flex-shrink-0">
+                  <Heart className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-3xl font-extrabold text-foreground tracking-tight">₹{totalDonationSum.toLocaleString('en-IN')}</p>
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">Total Donations</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-elevation-2 hover:-translate-y-1 transition-all duration-300 rounded-3xl border-border/40">
+            <CardContent className="pt-6 pb-5">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center flex-shrink-0">
+                  <Activity className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-3xl font-extrabold text-foreground tracking-tight">{stats?.avgAttendance || 0}%</p>
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">Avg Attendance</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-elevation-2 hover:-translate-y-1 transition-all duration-300 rounded-3xl border-border/40">
+            <CardContent className="pt-6 pb-5">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-3xl font-extrabold text-foreground tracking-tight">{stats?.activeFamilies || (families as any[]).length}</p>
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">Active Families</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Tabbed Analytics */}
@@ -559,6 +631,165 @@ export default function Analytics() {
           </CardContent>
         </Card>
       </main>
+
+      {/* Print PDF Report Dialog */}
+      <Dialog open={isPrintModalOpen} onOpenChange={setIsPrintModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto border-amber-200">
+          <DialogHeader className="print:hidden">
+            <DialogTitle className="text-amber-950 font-bold text-lg flex items-center gap-2">
+              <Download className="w-5 h-5 text-orange-600 animate-pulse" /> Operational PDF Report Preview
+            </DialogTitle>
+          </DialogHeader>
+          
+          {/* Printable Report Document */}
+          <div id="printable-analytics-report" className="p-8 bg-white text-slate-900 space-y-6 font-sans">
+            {/* Report Header */}
+            <div className="flex items-center justify-between border-b-2 border-amber-500 pb-4">
+              <div className="space-y-1">
+                <h1 className="text-2xl font-bold text-amber-900 font-serif">Devotional Community Portal</h1>
+                <p className="text-xs text-muted-foreground">Comprehensive Operations & Devotee Analytics Report</p>
+              </div>
+              <div className="text-right text-xs">
+                <p className="font-bold text-amber-950">Jai Shree Madhav 🙏</p>
+                <p className="text-slate-500 font-medium">Date: {new Date().toLocaleDateString("en-IN", { dateStyle: "long" })}</p>
+              </div>
+            </div>
+
+            {/* Metrics Grid */}
+            <div className="grid grid-cols-4 gap-4 pt-2">
+              <div className="p-3 bg-amber-50/50 border border-amber-200 rounded-lg text-center shadow-sm">
+                <p className="text-[10px] text-amber-900 font-bold uppercase tracking-wider">Total Devotees</p>
+                <p className="text-xl font-extrabold text-amber-950 mt-1">{stats?.totalDevotees || devotees.length}</p>
+              </div>
+              <div className="p-3 bg-amber-50/50 border border-amber-200 rounded-lg text-center shadow-sm">
+                <p className="text-[10px] text-amber-900 font-bold uppercase tracking-wider">Total Contributions</p>
+                <p className="text-xl font-extrabold text-amber-950 mt-1">₹{totalDonationSum.toLocaleString('en-IN')}</p>
+              </div>
+              <div className="p-3 bg-amber-50/50 border border-amber-200 rounded-lg text-center shadow-sm">
+                <p className="text-[10px] text-amber-900 font-bold uppercase tracking-wider">Average Attendance</p>
+                <p className="text-xl font-extrabold text-amber-950 mt-1">{stats?.avgAttendance || 0}%</p>
+              </div>
+              <div className="p-3 bg-amber-50/50 border border-amber-200 rounded-lg text-center shadow-sm">
+                <p className="text-[10px] text-amber-900 font-bold uppercase tracking-wider">Active Families</p>
+                <p className="text-xl font-extrabold text-amber-950 mt-1">{stats?.activeFamilies || families.length}</p>
+              </div>
+            </div>
+
+            {/* Section: Devotee Demographics */}
+            <div className="space-y-3">
+              <h2 className="text-sm font-bold text-amber-950 border-b border-amber-100 pb-1 uppercase tracking-wide">1. Devotee Demographics Summary</h2>
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                {/* Spiritual Levels */}
+                <div className="border border-slate-100 rounded p-3">
+                  <h3 className="font-bold text-slate-800 mb-2">Spiritual Level Distribution</h3>
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-slate-100 font-semibold text-slate-600">
+                        <th className="pb-1">Level</th>
+                        <th className="pb-1 text-right">Count</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {spiritData.map(d => (
+                        <tr key={d.name}>
+                          <td className="py-1 text-slate-700">{d.name}</td>
+                          <td className="py-1 text-right font-medium">{d.value}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Cities */}
+                <div className="border border-slate-100 rounded p-3">
+                  <h3 className="font-bold text-slate-800 mb-2">Top Congregations by City</h3>
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-slate-100 font-semibold text-slate-600">
+                        <th className="pb-1">City</th>
+                        <th className="pb-1 text-right">Devotees</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {cityData.map(d => (
+                        <tr key={d.city}>
+                          <td className="py-1 text-slate-700">{d.city}</td>
+                          <td className="py-1 text-right font-medium">{d.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Section: Donation & Contributions */}
+            <div className="space-y-3 pt-2">
+              <h2 className="text-sm font-bold text-amber-950 border-b border-amber-100 pb-1 uppercase tracking-wide">2. Donation Summary by Purpose</h2>
+              <table className="w-full text-left text-xs border border-slate-100 rounded overflow-hidden">
+                <thead>
+                  <tr className="bg-slate-50 font-semibold text-slate-700">
+                    <th className="p-2 border-b border-slate-100">Purpose / Category</th>
+                    <th className="p-2 border-b border-slate-100 text-right">Total Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {purposeData.map(d => (
+                    <tr key={d.name}>
+                      <td className="p-2 text-slate-700 font-medium">{d.name}</td>
+                      <td className="p-2 text-right font-bold text-emerald-700">₹{d.value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-amber-50/30 font-bold border-t-2 border-amber-100">
+                    <td className="p-2 text-amber-950">Grand Total Contributions</td>
+                    <td className="p-2 text-right text-amber-900 text-sm">₹{totalDonationSum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Section: Volunteering Activities */}
+            <div className="space-y-3 pt-2">
+              <h2 className="text-sm font-bold text-amber-950 border-b border-amber-100 pb-1 uppercase tracking-wide">3. Seva (Volunteering) Operations</h2>
+              <table className="w-full text-left text-xs border border-slate-100 rounded overflow-hidden">
+                <thead>
+                  <tr className="bg-slate-50 font-semibold text-slate-700">
+                    <th className="p-2 border-b border-slate-100">Activity Type</th>
+                    <th className="p-2 border-b border-slate-100 text-right">Total Completed Hours</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {volunteeringStats.length === 0 ? (
+                    <tr><td colSpan={2} className="p-4 text-center text-muted-foreground italic">No volunteering activity data logged.</td></tr>
+                  ) : (
+                    volunteeringStats.map(d => (
+                      <tr key={d.activity}>
+                        <td className="p-2 text-slate-700">{d.activity}</td>
+                        <td className="p-2 text-right font-bold">{d.hours} hrs</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Report Footer */}
+            <div className="border-t border-slate-200 pt-4 flex justify-between items-center text-[10px] text-muted-foreground mt-8">
+              <span>Report Generated Automatically • Devotional Community Portal</span>
+              <span>Page 1 of 1</span>
+            </div>
+          </div>
+
+          <div className="flex gap-2 justify-end pt-4 print:hidden">
+            <Button onClick={() => window.print()} className="bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold">
+              Print / Save as PDF
+            </Button>
+            <Button variant="outline" onClick={() => setIsPrintModalOpen(false)}>
+              Close Preview
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

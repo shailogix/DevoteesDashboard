@@ -1979,6 +1979,241 @@ function ApiBuilderPanel() {
   );
 }
 
+function UserApprovalsPanel() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
+
+  const { data: usersData = [], isLoading: loadingUsers, refetch: refetchUsers } = useQuery<any[]>({
+    queryKey: ["/api/users"],
+  });
+
+  const { data: approvalsData = [], isLoading: loadingApprovals, refetch: refetchApprovals } = useQuery<any[]>({
+    queryKey: ["/api/admin/approvals"],
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      const res = await fetch(`/api/admin/approvals/${userId}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      if (!res.ok) throw new Error("Failed to approve user");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "User Approved", description: `Activation code generated: ${data.loginCode}` });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/approvals"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Approval Failed", description: err.message, variant: "destructive" });
+    }
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await fetch(`/api/admin/approvals/${userId}/reject`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to reject user");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "User Rejected" });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/approvals"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Rejection Failed", description: err.message, variant: "destructive" });
+    }
+  });
+
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      const res = await fetch(`/api/users/${userId}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to update role");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Role Updated Successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Role Update Failed", description: err.message, variant: "destructive" });
+    }
+  });
+
+  const handleRoleSelect = (userId: string, role: string) => {
+    setSelectedRoles(prev => ({ ...prev, [userId]: role }));
+  };
+
+  const filteredUsers = usersData.filter((u: any) => 
+    (u.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.firstName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.lastName || "").toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left/Top: Pending Approvals */}
+        <Card className="lg:col-span-1 border-amber-500/20 shadow-sm shadow-amber-500/5">
+          <CardHeader className="bg-amber-500/5 pb-3">
+            <CardTitle className="text-sm font-bold tracking-wider text-amber-700 uppercase flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 animate-pulse" /> Pending Approvals ({approvalsData.length})
+            </CardTitle>
+            <CardDescription className="text-xs">Users awaiting registration code activation</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-4">
+            {loadingApprovals ? (
+              <div className="flex justify-center py-6"><RefreshCw className="w-6 h-6 animate-spin text-primary" /></div>
+            ) : approvalsData.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-xs">
+                No pending registrations
+              </div>
+            ) : (
+              <div className="space-y-4 divide-y divide-border">
+                {approvalsData.map((appUser: any, idx: number) => {
+                  const selectedRole = selectedRoles[appUser.id] || "user";
+                  return (
+                    <div key={appUser.id} className={`pt-3 ${idx === 0 ? 'pt-0' : ''} space-y-2`}>
+                      <div>
+                        <p className="font-semibold text-xs text-foreground">{appUser.firstName} {appUser.lastName}</p>
+                        <p className="text-[10px] text-muted-foreground">{appUser.email}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Select value={selectedRole} onValueChange={(v) => handleRoleSelect(appUser.id, v)}>
+                          <SelectTrigger className="h-7 text-xs w-28">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="user">Devotee</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="volunteer">Volunteer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button 
+                          size="sm" 
+                          className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white" 
+                          onClick={() => approveMutation.mutate({ userId: appUser.id, role: selectedRole })}
+                          disabled={approveMutation.isPending}
+                        >
+                          Approve
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-7 text-xs text-destructive hover:bg-destructive/10"
+                          onClick={() => rejectMutation.mutate(appUser.id)}
+                          disabled={rejectMutation.isPending}
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Right: Active Users list and role modification */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2"><Users className="w-4 h-4 text-primary" /> Active Users & Roles</CardTitle>
+                <CardDescription className="text-xs">Update roles and check generated activation codes</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input 
+                    placeholder="Search users..." 
+                    value={searchTerm} 
+                    onChange={e => setSearchTerm(e.target.value)} 
+                    className="h-7 text-xs pl-8 w-44" 
+                  />
+                </div>
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { refetchUsers(); refetchApprovals(); }}>
+                  <RefreshCw className="w-3 h-3" />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {loadingUsers ? (
+              <div className="flex justify-center py-12"><RefreshCw className="w-6 h-6 animate-spin text-primary" /></div>
+            ) : filteredUsers.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">No users found</div>
+            ) : (
+              <div className="overflow-x-auto border-t border-border">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30">
+                      <th className="p-3 font-semibold">User</th>
+                      <th className="p-3 font-semibold">Status</th>
+                      <th className="p-3 font-semibold">Activation Code</th>
+                      <th className="p-3 font-semibold">Assigned Role</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map((item: any) => (
+                      <tr key={item.id} className="border-b border-border hover:bg-muted/10">
+                        <td className="p-3">
+                          <div className="font-semibold">{item.firstName} {item.lastName}</div>
+                          <div className="text-muted-foreground text-[10px]">{item.email}</div>
+                        </td>
+                        <td className="p-3 capitalize">
+                          <Badge variant={item.approvalStatus === "approved" ? "default" : "secondary"}>
+                            {item.approvalStatus}
+                          </Badge>
+                        </td>
+                        <td className="p-3 font-mono font-bold text-amber-700">
+                          {item.loginCode || "-"}
+                        </td>
+                        <td className="p-3">
+                          <Select 
+                            value={item.role} 
+                            onValueChange={(newRole) => updateRoleMutation.mutate({ userId: item.id, role: newRole })}
+                            disabled={updateRoleMutation.isPending}
+                          >
+                            <SelectTrigger className="h-7 text-xs w-28">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="user">Devotee</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="manager">Manager</SelectItem>
+                              <SelectItem value="volunteer">Volunteer</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 export default function DevStudio() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -2150,6 +2385,7 @@ export default function DevStudio() {
   ];
 
   const TAB_ROW1_EXTRA = [
+    { id: "user-approvals", label: "User Approvals", icon: Users },
     { id: "csv-import", label: "CSV Import/Export", icon: Download },
     { id: "api-docs", label: "API Docs", icon: FileJson },
   ];
@@ -2196,7 +2432,7 @@ export default function DevStudio() {
               ))}
             </TabsList>
             <div className="text-xs text-muted-foreground px-1 mt-1 mb-1 font-medium tracking-wider">DATA & DOCUMENTATION</div>
-            <TabsList className="grid grid-cols-2 w-full bg-green-50 border border-green-200">
+            <TabsList className="grid grid-cols-3 w-full bg-green-50 border border-green-200">
               {TAB_ROW1_EXTRA.map(({ id, label, icon: Icon }) => (
                 <TabsTrigger key={id} value={id} className="flex items-center gap-1.5 text-xs data-[state=active]:bg-green-500 data-[state=active]:text-white data-[state=active]:shadow-sm">
                   <Icon className="w-3.5 h-3.5" /> {label}
@@ -2780,6 +3016,11 @@ export default function DevStudio() {
           {/* ── SCHEMA VISUALIZER ── */}
           <TabsContent value="schema-visualizer">
             <SchemaVisualizer />
+          </TabsContent>
+
+          {/* ── USER APPROVALS ── */}
+          <TabsContent value="user-approvals">
+            <UserApprovalsPanel />
           </TabsContent>
 
           {/* ── CSV IMPORT/EXPORT ── */}
