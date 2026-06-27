@@ -17,6 +17,27 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+
+async function godModeApiRequest(method: string, url: string, data?: any) {
+  const res = await adminFetch(url, {
+    method,
+    body: data ? JSON.stringify(data) : undefined,
+  });
+  if (!res.ok) {
+    const text = (await res.text()) || res.statusText;
+    throw new Error(`${res.status}: ${text}`);
+  }
+  return res;
+}
+
+const godModeQueryFn = async ({ queryKey }: any) => {
+  const res = await adminFetch(queryKey[0]);
+  if (!res.ok) {
+    if (res.status === 401) return null;
+    throw new Error(await res.text());
+  }
+  return res.json().catch(() => ({}));
+};
 import { useTheme } from "@/contexts/ThemeContext";
 import {
   Code2, Palette, Navigation, Settings, Users, Database,
@@ -28,10 +49,10 @@ import {
   Sliders, Sparkles, Tag, Move, Edit2, Search, Link2, Unlink2,
   Play, Square, Zap, Clock, Activity, Filter, Table, GitBranch,
   CheckSquare, MinusSquare, ArrowRight, XCircle, Info,
-  Terminal, Flag, Sprout, RotateCw, Send
+  Terminal, Flag, Sprout, RotateCw, Send, Lock
 } from "lucide-react";
 import { useVisualEditor } from "@/contexts/VisualEditorContext";
-import { adminFetch } from "@/contexts/DevModeContext";
+import { adminFetch, useDevMode } from "@/contexts/DevModeContext";
 import { SchemaVisualizer } from "@/components/DevStudio/SchemaVisualizer";
 import { CsvExportImport } from "@/components/DevStudio/CsvExportImport";
 import { ApiDocumentation } from "@/components/DevStudio/ApiDocumentation";
@@ -104,39 +125,67 @@ function DataBrowser() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addData, setAddData] = useState<any>({});
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
 
   const { data: rows = [], isLoading } = useQuery<any[]>({ queryKey: [`/api/${entity}`] });
-  const { data: devotees = [] } = useQuery<any[]>({ queryKey: ["/api/devotees"] });
-  const { data: families = [] } = useQuery<any[]>({ queryKey: ["/api/families"] });
-  const { data: events = [] } = useQuery<any[]>({ queryKey: ["/api/events"] });
+  const { data: devotees = [] } = useQuery<any[]>({ queryKey: ["/api/devotees"], queryFn: godModeQueryFn });
+  const { data: families = [] } = useQuery<any[]>({ queryKey: ["/api/families"], queryFn: godModeQueryFn });
+  const { data: events = [] } = useQuery<any[]>({ queryKey: ["/api/events"], queryFn: godModeQueryFn });
 
   const devoteeMap = useMemo(() => { const m: Record<number, string> = {}; devotees.forEach((d: any) => { m[d.id] = `${d.firstName} ${d.lastName}`; }); return m; }, [devotees]);
   const familyMap = useMemo(() => { const m: Record<number, string> = {}; families.forEach((f: any) => { m[f.id] = f.familyName; }); return m; }, [families]);
   const eventMap = useMemo(() => { const m: Record<number, string> = {}; events.forEach((e: any) => { m[e.id] = e.title; }); return m; }, [events]);
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/${entity}/${id}`, data),
+    mutationFn: ({ id, data }: { id: number; data: any }) => godModeApiRequest("PATCH", `/api/${entity}/${id}`, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/${entity}`] }); setEditingRow(null); toast({ title: "Record updated" }); },
     onError: () => toast({ title: "Update failed", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/${entity}/${id}`, undefined),
+    mutationFn: (id: number) => godModeApiRequest("DELETE", `/api/${entity}/${id}`, undefined),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/${entity}`] }); toast({ title: "Record deleted" }); },
     onError: () => toast({ title: "Delete failed", variant: "destructive" }),
   });
 
   const bulkDeleteMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/admin/bulk", { entity, operation: "delete", ids: Array.from(selectedIds) }),
+    mutationFn: () => godModeApiRequest("POST", "/api/admin/bulk", { entity, operation: "delete", ids: Array.from(selectedIds) }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/${entity}`] }); setSelectedIds(new Set()); toast({ title: `${selectedIds.size} records deleted` }); },
     onError: () => toast({ title: "Bulk delete failed", variant: "destructive" }),
   });
 
   const filteredRows = useMemo(() => {
-    if (!searchTerm) return rows;
-    const s = searchTerm.toLowerCase();
-    return rows.filter((r: any) => Object.values(r).some(v => String(v || "").toLowerCase().includes(s)));
-  }, [rows, searchTerm]);
+    let result = (rows as any[]);
+    if (searchTerm) {
+      const s = searchTerm.toLowerCase();
+      result = result.filter((r: any) => Object.values(r).some(v => String(v || "").toLowerCase().includes(s)));
+    }
+    if (sortKey) {
+      result = [...result].sort((a: any, b: any) => {
+        const av = a[sortKey] ?? '';
+        const bv = b[sortKey] ?? '';
+        const cmp = String(av).localeCompare(String(bv), undefined, { numeric: true });
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+    return result;
+  }, [rows, searchTerm, sortKey, sortDir]);
+
+  const paginatedRows = useMemo(() => filteredRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), [filteredRows, page]);
+  const totalPages = Math.ceil(filteredRows.length / PAGE_SIZE);
+
+  const exportCSV = () => {
+    const cols = getColumns();
+    const header = cols.join(',');
+    const body = filteredRows.map((r: any) => cols.map((c: string) => JSON.stringify(r[c] ?? '')).join(',')).join('\n');
+    const blob = new Blob([header + '\n' + body], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `${entity}-export.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const getDisplayValue = (key: string, val: any): string => {
     if (val === null || val === undefined) return "—";
@@ -189,6 +238,8 @@ function DataBrowser() {
               <Trash2 className="w-3 h-3 mr-1" /> Delete {selectedIds.size} selected
             </Button>
           )}
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={exportCSV}><Download className="w-3 h-3 mr-1" />CSV</Button>
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { import('@tanstack/react-query').then(()=>{}); queryClient.invalidateQueries({ queryKey: [`/api/${entity}`] }); }}><RefreshCw className="w-3 h-3 mr-1" />Refresh</Button>
           <Badge variant="outline" className="text-xs">{filteredRows.length} / {rows.length} records</Badge>
         </div>
       </div>
@@ -206,15 +257,20 @@ function DataBrowser() {
                       onChange={toggleSelectAll} className="rounded" />
                   </th>
                   {columns.map(col => (
-                    <th key={col} className="p-2 text-left font-medium text-muted-foreground whitespace-nowrap capitalize">
-                      {col.replace(/([A-Z])/g, ' $1').trim()}
+                    <th key={col}
+                      className="p-2 text-left font-medium text-muted-foreground whitespace-nowrap capitalize cursor-pointer select-none hover:text-foreground transition-colors"
+                      onClick={() => { if (sortKey === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortKey(col); setSortDir('asc'); setPage(0); } }}>
+                      <span className="flex items-center gap-1">
+                        {col.replace(/([A-Z])/g, ' $1').trim()}
+                        {sortKey === col && <span className="text-[10px] opacity-70">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+                      </span>
                     </th>
                   ))}
                   <th className="p-2 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.map((row: any) => (
+                {paginatedRows.map((row: any) => (
                   <tr key={row.id} className={`border-t border-border hover:bg-muted/20 ${selectedIds.has(row.id) ? "bg-primary/5" : ""}`}>
                     <td className="p-2">
                       <input type="checkbox" checked={selectedIds.has(row.id)}
@@ -259,6 +315,15 @@ function DataBrowser() {
                 ))}
               </tbody>
             </table>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-3 py-2 border-t border-border bg-muted/20 text-xs text-muted-foreground">
+                <span>Page {page + 1} of {totalPages} ({filteredRows.length} total)</span>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="outline" className="h-6 text-xs px-2" onClick={() => setPage(p => Math.max(0, p-1))} disabled={page === 0}>Prev</Button>
+                  <Button size="sm" variant="outline" className="h-6 text-xs px-2" onClick={() => setPage(p => Math.min(totalPages-1, p+1))} disabled={page >= totalPages-1}>Next</Button>
+                </div>
+              </div>
+            )}
             {filteredRows.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
                 <Database className="w-8 h-8 mx-auto mb-2 opacity-30" />
@@ -280,18 +345,18 @@ function RelationalMap() {
   const [linkFamilyId, setLinkFamilyId] = useState<string>("");
   const [linkMentorId, setLinkMentorId] = useState<string>("");
 
-  const { data: devotees = [] } = useQuery<any[]>({ queryKey: ["/api/devotees"] });
-  const { data: families = [] } = useQuery<any[]>({ queryKey: ["/api/families"] });
-  const { data: mentors = [] } = useQuery<any[]>({ queryKey: ["/api/mentors"] });
+  const { data: devotees = [] } = useQuery<any[]>({ queryKey: ["/api/devotees"], queryFn: godModeQueryFn });
+  const { data: families = [] } = useQuery<any[]>({ queryKey: ["/api/families"], queryFn: godModeQueryFn });
+  const { data: mentors = [] } = useQuery<any[]>({ queryKey: ["/api/mentors"], queryFn: godModeQueryFn });
 
   const { data: relations, isLoading: relLoading } = useQuery<any>({
     queryKey: ["/api/admin/relations/devotee", selectedDevoteeId],
-    queryFn: () => selectedDevoteeId ? fetch(`/api/admin/relations/devotee/${selectedDevoteeId}`, { credentials: "include" }).then(r => r.json()) : null,
+    queryFn: () => selectedDevoteeId ? adminFetch(`/api/admin/relations/devotee/${selectedDevoteeId}`).then(r => r.json()) : null,
     enabled: !!selectedDevoteeId,
   });
 
   const linkMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("PATCH", "/api/admin/link", data),
+    mutationFn: (data: any) => godModeApiRequest("PATCH", "/api/admin/link", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/relations/devotee", selectedDevoteeId] });
       queryClient.invalidateQueries({ queryKey: ["/api/devotees"] });
@@ -498,22 +563,23 @@ function MacroStudio() {
   const [stepData, setStepData] = useState("{}");
   const [runResult, setRunResult] = useState<any>(null);
   const [showRunResult, setShowRunResult] = useState(false);
+  const clearLogs = () => { setRunResult(null); setShowRunResult(false); };
 
-  const { data: macros = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/admin/macros"] });
+  const { data: macros = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/admin/macros"], queryFn: godModeQueryFn });
 
   const createMacro = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/admin/macros", { name: macroName, description: macroDesc, steps }),
+    mutationFn: () => godModeApiRequest("POST", "/api/admin/macros", { name: macroName, description: macroDesc, steps }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/macros"] }); setShowCreate(false); setMacroName(""); setMacroDesc(""); setSteps([]); toast({ title: "Macro saved" }); },
     onError: () => toast({ title: "Failed to save macro", variant: "destructive" }),
   });
 
   const deleteMacro = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/admin/macros/${id}`, undefined),
+    mutationFn: (id: number) => godModeApiRequest("DELETE", `/api/admin/macros/${id}`, undefined),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/macros"] }); toast({ title: "Macro deleted" }); },
   });
 
   const runMacro = useMutation({
-    mutationFn: (id: number) => apiRequest("POST", `/api/admin/macros/${id}/run`, {}),
+    mutationFn: (id: number) => godModeApiRequest("POST", `/api/admin/macros/${id}/run`, {}),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/macros"] });
       setRunResult(data); setShowRunResult(true);
@@ -677,7 +743,7 @@ function MacroStudio() {
           <DialogHeader><DialogTitle>Macro Run Results — {runResult?.macro}</DialogTitle></DialogHeader>
           <ScrollArea className="h-64">
             {runResult?.results?.map((r: any, i: number) => (
-              <div key={i} className={`flex items-start gap-3 p-2 rounded mb-2 ${r.status === "ok" ? "bg-green-50 border border-green-200" : r.status === "error" ? "bg-red-50 border border-red-200" : "bg-muted"}`}>
+              <div key={i} className={`flex items-start gap-3 p-2 rounded mb-2 ${r.status === "ok" ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900/50" : r.status === "error" ? "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50" : "bg-muted"}`}>
                 {r.status === "ok" ? <Check className="w-4 h-4 text-green-600 mt-0.5" /> : r.status === "error" ? <XCircle className="w-4 h-4 text-red-600 mt-0.5" /> : <Info className="w-4 h-4 text-muted-foreground mt-0.5" />}
                 <div>
                   <p className="text-xs font-medium">{r.step}</p>
@@ -704,7 +770,7 @@ function AuditLog() {
       const params = new URLSearchParams({ limit: "200" });
       if (entityFilter !== "all") params.set("entity", entityFilter);
       if (actionFilter !== "all") params.set("action", actionFilter);
-      return fetch(`/api/admin/audit?${params}`, { credentials: "include" }).then(r => r.json());
+      return adminFetch(`/api/admin/audit?${params}`).then(r => r.json());
     },
     refetchInterval: 10000,
   });
@@ -765,7 +831,7 @@ function AuditLog() {
           <div className="divide-y divide-border">
             {logs.map((log: any) => (
               <div key={log.id} className="flex items-start gap-3 p-3 hover:bg-muted/20">
-                <Badge className={`text-xs shrink-0 mt-0.5 ${actionColors[log.action] || "bg-gray-100 text-gray-800"}`}>{log.action}</Badge>
+                <Badge className={`text-xs shrink-0 mt-0.5 ${actionColors[log.action] || "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"}`}>{log.action}</Badge>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-medium capitalize">{log.entity}</span>
@@ -790,14 +856,35 @@ function AuditLog() {
   );
 }
 
-// ─── SECURITY DISPATCH HUB COMPONENT ──────────────────────────────────────
+// ─── SECURITY DISPATCH HUB COMPONENT ────────────────────────────────────────────────
 function DispatchHub() {
   const { toast } = useToast();
-  const { data: logs = [], isLoading, refetch } = useQuery<any[]>({
+  const queryClient = useQueryClient();
+  const [filterType, setFilterType] = useState("all");
+
+  const testNotifMutation = useMutation({
+    mutationFn: async () => {
+      const res = await adminFetch("/api/admin/test-notification", {
+        method: "POST",
+        body: JSON.stringify({ type: "email", recipient: "test@example.com", message: "Elite Dispatch Test — System verification ping." }),
+      });
+      if (!res.ok) throw new Error("Dispatch failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/dispatch-logs"] });
+      toast({ title: "Test notification dispatched", description: "Check the log below." });
+    },
+    onError: () => toast({ title: "Test dispatch failed", variant: "destructive" }),
+  });
+
+  const { data: allLogs = [], isLoading, refetch } = useQuery<any[]>({
     queryKey: ["/api/admin/dispatch-logs"],
-    queryFn: () => fetch("/api/admin/dispatch-logs", { credentials: "include" }).then(r => r.json()),
+    queryFn: () => adminFetch("/api/admin/dispatch-logs").then(r => r.json()),
     refetchInterval: 10000,
   });
+
+  const logs = useMemo(() => filterType === "all" ? allLogs : allLogs.filter((l: any) => l.dispatchType === filterType), [allLogs, filterType]);
 
   const typeColors: Record<string, string> = {
     email: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300",
@@ -810,16 +897,10 @@ function DispatchHub() {
     const match = body.match(/\b\d{6,7}\b/);
     if (match) {
       navigator.clipboard.writeText(match[0]);
-      toast({
-        title: "Code Copied!",
-        description: `Successfully copied code: ${match[0]}`,
-      });
+      toast({ title: "Code Copied!", description: `Successfully copied code: ${match[0]}` });
     } else {
       navigator.clipboard.writeText(body);
-      toast({
-        title: "Copied Message Body",
-        description: "Entire message text copied to clipboard.",
-      });
+      toast({ title: "Copied Message Body", description: "Entire message text copied to clipboard." });
     }
   };
 
@@ -827,15 +908,30 @@ function DispatchHub() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-semibold flex items-center gap-2"><Send className="w-5 h-5 text-primary" /> Security & Dispatch Hub</h3>
+          <h3 className="font-semibold flex items-center gap-2"><Send className="w-5 h-5 text-primary" /> Security &amp; Dispatch Hub</h3>
           <p className="text-sm text-muted-foreground">Real-time audit trail of all security codes, OTP dispatches, and devotee notification logs.</p>
         </div>
-        <Button size="sm" variant="outline" onClick={() => refetch()}><RefreshCw className="w-3.5 h-3.5 mr-1" /> Refresh</Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="text-xs" onClick={() => testNotifMutation.mutate()} disabled={testNotifMutation.isPending}>
+            <Zap className="w-3.5 h-3.5 mr-1" /> {testNotifMutation.isPending ? "Sending..." : "Test Send"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => refetch()}><RefreshCw className="w-3.5 h-3.5 mr-1" /> Refresh</Button>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        <Select value={filterType} onValueChange={setFilterType}>
+          <SelectTrigger className="w-32 h-7 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="email">Email</SelectItem>
+            <SelectItem value="sms">SMS</SelectItem>
+            <SelectItem value="otp">OTP</SelectItem>
+            <SelectItem value="whatsapp">WhatsApp</SelectItem>
+          </SelectContent>
+        </Select>
         <Badge variant="outline" className="text-xs">{logs.length} dispatch entries</Badge>
-        <span className="text-[10px] text-muted-foreground italic">(Simulated outbox - logs all sent messages and codes)</span>
+        <span className="text-[10px] text-muted-foreground italic">(Simulated outbox)</span>
       </div>
 
       {isLoading ? (
@@ -852,7 +948,7 @@ function DispatchHub() {
         <ScrollArea className="h-[500px] border rounded-lg">
           <div className="divide-y divide-border">
             {logs.map((log: any) => {
-              const codeMatch = log.body.match(/\b\d{6,7}\b/);
+              const codeMatch = log.body?.match(/\b\d{6,7}\b/);
               return (
                 <div key={log.id} className="flex items-start gap-4 p-4 hover:bg-muted/10 transition-colors">
                   <Badge variant="outline" className={`text-[10px] uppercase font-bold shrink-0 mt-0.5 ${typeColors[log.dispatchType] || "bg-gray-100 text-gray-800"}`}>
@@ -863,12 +959,10 @@ function DispatchHub() {
                       <span className="text-xs font-semibold text-foreground">To: {log.recipient}</span>
                       {log.subject && <span className="text-xs text-muted-foreground font-medium">· {log.subject}</span>}
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed bg-muted/30 p-2 rounded border border-border/20 max-w-2xl">
-                      {log.body}
-                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed bg-muted/30 p-2 rounded border border-border/20 max-w-2xl">{log.body}</p>
                     {codeMatch && (
                       <div className="flex items-center gap-2 mt-1.5">
-                        <span className="text-[10px] font-semibold text-amber-700 bg-amber-500/5 px-2 py-0.5 rounded border border-amber-500/20">Code Detected: {codeMatch[0]}</span>
+                        <span className="text-[10px] font-semibold text-amber-700 bg-amber-500/5 px-2 py-0.5 rounded border border-amber-500/20">Code: {codeMatch[0]}</span>
                         <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleCopyCode(log.body)}>
                           <Copy className="w-3 h-3 mr-1" /> Copy Code
                         </Button>
@@ -878,7 +972,7 @@ function DispatchHub() {
                   <div className="flex flex-col items-end gap-1.5 shrink-0 text-right">
                     <span className="text-[10px] text-muted-foreground">{new Date(log.sentAt).toLocaleTimeString()}</span>
                     <span className="text-[10px] text-muted-foreground">{new Date(log.sentAt).toLocaleDateString()}</span>
-                    <Badge variant="outline" className="text-[9px] bg-green-50 text-green-700 border-green-200 uppercase font-bold py-0">{log.status}</Badge>
+                    <Badge variant="outline" className="text-[9px] bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/50 uppercase font-bold py-0">{log.status}</Badge>
                   </div>
                 </div>
               );
@@ -1040,7 +1134,10 @@ function ApiConsole() {
     setLoading(true);
     const t0 = Date.now();
     try {
-      const opts: RequestInit = { method, credentials: "include", headers: { "Content-Type": "application/json" } };
+      const godToken = (await import("@/contexts/DevModeContext")).getGodModeToken();
+      const headers: Record<string,string> = { "Content-Type": "application/json" };
+      if (godToken) headers["X-God-Mode-Token"] = godToken;
+      const opts: RequestInit = { method, credentials: "include", headers };
       if (method !== "GET" && body.trim()) opts.body = body;
       const res = await fetch(endpoint, opts);
       const elapsed = Date.now() - t0;
@@ -1182,7 +1279,7 @@ function FeatureFlagsPanel() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: flagsData, isLoading } = useQuery<any>({ queryKey: ["/api/admin/feature-flags"] });
+  const { data: flagsData, isLoading } = useQuery<any>({ queryKey: ["/api/admin/feature-flags"], queryFn: godModeQueryFn });
 
   const updateMutation = useMutation({
     mutationFn: (flags: Record<string, boolean>) =>
@@ -1227,7 +1324,7 @@ function FeatureFlagsPanel() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {Object.entries(FLAG_META).map(([key, meta]) => (
-              <div key={key} className={`flex items-start gap-3 p-3 rounded-lg border-2 transition-all ${flags[key] ? 'border-green-300 bg-green-50' : 'border-muted bg-muted/30'}`}>
+              <div key={key} className={`flex items-start gap-3 p-3 rounded-lg border-2 transition-all ${flags[key] ? 'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/30' : 'border-muted bg-muted/30'}`}>
                 <div className="text-2xl flex-shrink-0">{meta.icon}</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
@@ -1239,8 +1336,8 @@ function FeatureFlagsPanel() {
               </div>
             ))}
           </div>
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-xs text-blue-700">
+          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-900/50">
+            <p className="text-xs text-blue-700 dark:text-blue-300">
               <strong>Note:</strong> Disabling a module hides it from the sidebar navigation. Data is preserved and the module can be re-enabled at any time.
             </p>
           </div>
@@ -1255,10 +1352,11 @@ function SeedManagerPanel() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmTruncate, setConfirmTruncate] = useState<string|null>(null);
   const [addEntity, setAddEntity] = useState("devotees");
   const [addCount, setAddCount] = useState(1);
 
-  const { data: counts, isLoading } = useQuery<any>({ queryKey: ["/api/admin/seed/counts"] });
+  const { data: counts, isLoading } = useQuery<any>({ queryKey: ["/api/admin/seed/counts"], queryFn: godModeQueryFn });
 
   const resetMutation = useMutation({
     mutationFn: () => adminFetch("/api/admin/seed/reset", { method: "POST" }).then(r => r.json()),
@@ -1267,6 +1365,24 @@ function SeedManagerPanel() {
       setConfirmReset(false);
       toast({ title: "Database reset", description: "All data restored to original demo seed" });
     },
+  });
+
+  const truncateMutation = useMutation({
+    mutationFn: async (entity: string) => {
+      const res = await adminFetch("/api/admin/seed/truncate", {
+        method: "POST",
+        body: JSON.stringify({ entity }),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/seed/counts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api"] });
+      setConfirmTruncate(null);
+      toast({ title: "Table truncated", description: data.message });
+    },
+    onError: (err: any) => toast({ title: "Truncate failed", description: err.message, variant: "destructive" }),
   });
 
   const addMutation = useMutation({
@@ -1748,16 +1864,16 @@ function PageBuilderPanel() {
   const queryClient = useQueryClient();
   const [newPage, setNewPage] = useState({ slug: "", label: "", description: "", icon: "Home", dataSource: "", sections: [{ type: "table", title: "Records", config: {} }] });
 
-  const { data: pages = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/admin/page-registry"] });
+  const { data: pages = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/admin/page-registry"], queryFn: godModeQueryFn });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/admin/page-registry", data),
+    mutationFn: (data: any) => godModeApiRequest("POST", "/api/admin/page-registry", data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/page-registry"] }); toast({ title: "Page created" }); setNewPage({ slug: "", label: "", description: "", icon: "Home", dataSource: "", sections: [{ type: "table", title: "Records", config: {} }] }); },
     onError: () => toast({ title: "Failed to create page", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/admin/page-registry/${id}`, undefined),
+    mutationFn: (id: number) => godModeApiRequest("DELETE", `/api/admin/page-registry/${id}`, undefined),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/page-registry"] }); toast({ title: "Page deleted" }); },
   });
 
@@ -1823,16 +1939,16 @@ function SchemaBuilderPanel() {
   const queryClient = useQueryClient();
   const [newSchema, setNewSchema] = useState({ tableName: "", label: "", description: "", fields: [{ name: "", type: "text", label: "", required: false }] });
 
-  const { data: schemas = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/admin/schema-registry"] });
+  const { data: schemas = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/admin/schema-registry"], queryFn: godModeQueryFn });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/admin/schema-registry", data),
+    mutationFn: (data: any) => godModeApiRequest("POST", "/api/admin/schema-registry", data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/schema-registry"] }); toast({ title: "Schema created" }); setNewSchema({ tableName: "", label: "", description: "", fields: [{ name: "", type: "text", label: "", required: false }] }); },
     onError: () => toast({ title: "Failed to create schema", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/admin/schema-registry/${id}`, undefined),
+    mutationFn: (id: number) => godModeApiRequest("DELETE", `/api/admin/schema-registry/${id}`, undefined),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/schema-registry"] }); toast({ title: "Schema deleted" }); },
   });
 
@@ -1903,16 +2019,16 @@ function ApiBuilderPanel() {
   const queryClient = useQueryClient();
   const [newRoute, setNewRoute] = useState({ label: "", method: "GET", path: "", description: "", sqlQuery: "", requiredRole: "user" });
 
-  const { data: routes = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/admin/route-registry"] });
+  const { data: routes = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/admin/route-registry"], queryFn: godModeQueryFn });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/admin/route-registry", data),
+    mutationFn: (data: any) => godModeApiRequest("POST", "/api/admin/route-registry", data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/route-registry"] }); toast({ title: "Route created" }); setNewRoute({ label: "", method: "GET", path: "", description: "", sqlQuery: "", requiredRole: "user" }); },
     onError: () => toast({ title: "Failed to create route", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/admin/route-registry/${id}`, undefined),
+    mutationFn: (id: number) => godModeApiRequest("DELETE", `/api/admin/route-registry/${id}`, undefined),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/route-registry"] }); toast({ title: "Route deleted" }); },
   });
 
@@ -1995,7 +2111,7 @@ function UserApprovalsPanel() {
 
   const approveMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      const res = await fetch(`/api/admin/approvals/${userId}/approve`, {
+      const res = await adminFetch(`/api/admin/approvals/${userId}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role }),
@@ -2015,7 +2131,7 @@ function UserApprovalsPanel() {
 
   const rejectMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const res = await fetch(`/api/admin/approvals/${userId}/reject`, {
+      const res = await adminFetch(`/api/admin/approvals/${userId}/reject`, {
         method: "POST",
       });
       if (!res.ok) throw new Error("Failed to reject user");
@@ -2214,17 +2330,107 @@ function UserApprovalsPanel() {
   );
 }
 
+
+// ─── DATABASE SQL CONSOLE ──────────────────────────────────────────────────
+function DatabaseSQLConsole() {
+  const { toast } = useToast();
+  const [query, setQuery] = useState("SELECT * FROM devotees LIMIT 10;");
+  const [result, setResult] = useState<any>(null);
+  const [readOnly, setReadOnly] = useState(true);
+
+  const execMutation = useMutation({
+    mutationFn: async (sqlQuery: string) => {
+      const res = await godModeApiRequest("POST", "/api/admin/sql-console", { query: sqlQuery });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setResult(data.result);
+      toast({ title: "Query executed successfully" });
+    },
+    onError: (err: any) => {
+      setResult({ error: err.message });
+      toast({ title: "Query failed", description: err.message, variant: "destructive" });
+    }
+  });
+
+  return (
+    <Card className="border-purple-200">
+      <CardHeader className="bg-purple-50/50 dark:bg-purple-950/20">
+        <CardTitle className="flex items-center gap-2"><Database className="w-5 h-5 text-purple-600" /> Database SQL Console</CardTitle>
+        <CardDescription>Execute raw SQL queries directly against the Postgres database. Exercise extreme caution.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-4">
+        <div className="space-y-2">
+          <Label className="text-xs font-semibold text-purple-700 dark:text-purple-400">SQL Query</Label>
+          <Textarea 
+            className="font-mono text-xs bg-zinc-950 text-green-400 h-32 border-purple-200 dark:border-purple-800" 
+            value={query} 
+            onChange={e => setQuery(e.target.value)} 
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <Button 
+            onClick={() => execMutation.mutate(query)} 
+            disabled={execMutation.isPending}
+            className="bg-purple-600 hover:bg-purple-700 text-white"
+          >
+            {execMutation.isPending ? "Executing..." : "Execute Query"} <Play className="w-4 h-4 ml-2" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <Switch checked={readOnly} onCheckedChange={setReadOnly} id="sql-readonly" />
+            <label htmlFor="sql-readonly" className={`text-xs font-medium cursor-pointer ${readOnly ? 'text-green-600' : 'text-red-500'}`}>
+              {readOnly ? '🔒 Read-Only' : '⚠️ Write Mode'}
+            </label>
+          </div>
+        </div>
+
+        {result && (
+          <div className="mt-4 space-y-2">
+            <Label>Results</Label>
+            <div className="bg-muted p-4 rounded-lg overflow-x-auto border border-border">
+              {result.error ? (
+                <div className="text-red-500 font-mono text-sm">{result.error}</div>
+              ) : Array.isArray(result) && result.length > 0 ? (
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-muted-foreground/10 text-muted-foreground">
+                    <tr>
+                      {Object.keys(result[0]).map(k => <th key={k} className="p-2 border-b font-medium">{k}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.map((row: any, i: number) => (
+                      <tr key={i} className="border-b last:border-0 border-border/50 hover:bg-muted/50">
+                        {Object.values(row).map((v: any, j: number) => (
+                          <td key={j} className="p-2 font-mono truncate max-w-[200px]">{String(v)}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="text-muted-foreground italic text-sm">Query executed. No rows returned.</div>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function DevStudio() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { setTheme } = useTheme();
+  const { godModeToken, showDevLogin } = useDevMode();
+  
   const [activeTab, setActiveTab] = useState("app-info");
   const [snapshotName, setSnapshotName] = useState("");
   const [importJson, setImportJson] = useState("");
   const [newNavItem, setNewNavItem] = useState({ name: "", href: "", icon: "Home" });
   const [newField, setNewField] = useState({ label: "", type: "text", entity: "devotee", required: false, placeholder: "", options: "" });
 
-  const { data: config, isLoading } = useQuery<any>({ queryKey: ["/api/dev-config"] });
+  const { data: config, isLoading } = useQuery<any>({ queryKey: ["/api/dev-config"], queryFn: godModeQueryFn });
 
   const [localAppInfo, setLocalAppInfo] = useState<any>(null);
   const [localNav, setLocalNav] = useState<any[]>([]);
@@ -2249,19 +2455,19 @@ export default function DevStudio() {
   };
 
   const saveAppInfoMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("PATCH", "/api/dev-config/app-info", data),
+    mutationFn: (data: any) => godModeApiRequest("PATCH", "/api/dev-config/app-info", data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/dev-config"] }); toast({ title: "App info saved" }); },
     onError: () => toast({ title: "Failed to save", variant: "destructive" }),
   });
 
   const saveNavMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("PATCH", "/api/dev-config/navigation", data),
+    mutationFn: (data: any) => godModeApiRequest("PATCH", "/api/dev-config/navigation", data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/dev-config"] }); toast({ title: "Navigation saved" }); },
     onError: () => toast({ title: "Failed to save", variant: "destructive" }),
   });
 
   const saveThemeMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("PATCH", "/api/dev-config/theme", data),
+    mutationFn: (data: any) => godModeApiRequest("PATCH", "/api/dev-config/theme", data),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/dev-config"] });
       toast({ title: "Theme saved" });
@@ -2271,31 +2477,31 @@ export default function DevStudio() {
   });
 
   const saveFieldsMutation = useMutation({
-    mutationFn: (fields: any[]) => apiRequest("PATCH", "/api/dev-config/custom-fields", { fields }),
+    mutationFn: (fields: any[]) => godModeApiRequest("PATCH", "/api/dev-config/custom-fields", { fields }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/dev-config"] }); toast({ title: "Custom fields saved" }); },
     onError: () => toast({ title: "Failed to save", variant: "destructive" }),
   });
 
   const saveRolesMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("PATCH", "/api/dev-config/role-profiles", data),
+    mutationFn: (data: any) => godModeApiRequest("PATCH", "/api/dev-config/role-profiles", data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/dev-config"] }); toast({ title: "Role profiles saved" }); },
     onError: () => toast({ title: "Failed to save", variant: "destructive" }),
   });
 
   const snapshotMutation = useMutation({
-    mutationFn: (name: string) => apiRequest("POST", "/api/dev-config/snapshot", { name }),
+    mutationFn: (name: string) => godModeApiRequest("POST", "/api/dev-config/snapshot", { name }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/dev-config"] }); setSnapshotName(""); toast({ title: "Snapshot saved" }); },
     onError: () => toast({ title: "Failed to save snapshot", variant: "destructive" }),
   });
 
   const restoreMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("POST", `/api/dev-config/restore/${id}`, {}),
+    mutationFn: (id: string) => godModeApiRequest("POST", `/api/dev-config/restore/${id}`, {}),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/dev-config"] }); toast({ title: "Config restored" }); },
     onError: () => toast({ title: "Failed to restore", variant: "destructive" }),
   });
 
   const importMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/dev-config/import", data),
+    mutationFn: (data: any) => godModeApiRequest("POST", "/api/dev-config/import", data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/dev-config"] }); setImportJson(""); toast({ title: "Config imported successfully" }); },
     onError: () => toast({ title: "Invalid config format", variant: "destructive" }),
   });
@@ -2372,6 +2578,27 @@ export default function DevStudio() {
     );
   }
 
+  if (!godModeToken) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-zinc-950 text-zinc-200">
+        <div className="max-w-md w-full text-center space-y-6 bg-zinc-900 border border-zinc-800 p-8 rounded-xl shadow-2xl">
+          <div className="w-16 h-16 bg-yellow-500/10 text-yellow-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Lock className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight text-white">Developer Studio Locked</h2>
+          <p className="text-zinc-400">
+            GOD Mode is currently inactive. You must unlock the studio to access and modify system configurations.
+          </p>
+          <div className="pt-4 flex gap-4 justify-center">
+            <Button onClick={showDevLogin} className="bg-yellow-500 text-black hover:bg-yellow-600 font-semibold px-8">
+              Unlock Studio
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const TAB_ROW1 = [
     { id: "app-info", label: "App Info", icon: LayoutDashboard },
     { id: "theme", label: "Theme Studio", icon: Paintbrush },
@@ -2400,6 +2627,7 @@ export default function DevStudio() {
   ];
 
   const TAB_ROW3 = [
+    { id: "sql-console", label: "SQL Console", icon: Database },
     { id: "api-console", label: "API Console", icon: Terminal },
     { id: "feature-flags", label: "Feature Flags", icon: Flag },
     { id: "seed-manager", label: "Seed Manager", icon: Sprout },
@@ -2426,31 +2654,31 @@ export default function DevStudio() {
             <div className="text-xs text-muted-foreground px-1 mb-1 font-medium tracking-wider">CONFIGURATION</div>
             <TabsList className="grid grid-cols-9 w-full bg-muted/60">
               {TAB_ROW1.map(({ id, label, icon: Icon }) => (
-                <TabsTrigger key={id} value={id} className="flex items-center gap-1.5 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <TabsTrigger key={id} value={id} className="flex items-center gap-1.5 text-xs data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm text-muted-foreground">
                   <Icon className="w-3.5 h-3.5" /> {label}
                 </TabsTrigger>
               ))}
             </TabsList>
             <div className="text-xs text-muted-foreground px-1 mt-1 mb-1 font-medium tracking-wider">DATA & DOCUMENTATION</div>
-            <TabsList className="grid grid-cols-3 w-full bg-green-50 border border-green-200">
+            <TabsList className="grid grid-cols-3 w-full bg-green-50 dark:bg-green-950/50 border border-green-200 dark:border-green-900/50">
               {TAB_ROW1_EXTRA.map(({ id, label, icon: Icon }) => (
-                <TabsTrigger key={id} value={id} className="flex items-center gap-1.5 text-xs data-[state=active]:bg-green-500 data-[state=active]:text-white data-[state=active]:shadow-sm">
+                <TabsTrigger key={id} value={id} className="flex items-center gap-1.5 text-xs data-[state=active]:bg-green-500 data-[state=active]:text-white data-[state=active]:shadow-sm text-green-700 dark:text-green-400">
                   <Icon className="w-3.5 h-3.5" /> {label}
                 </TabsTrigger>
               ))}
             </TabsList>
             <div className="text-xs text-muted-foreground px-1 mt-3 mb-1 font-medium tracking-wider">GOD MODE TOOLS</div>
-            <TabsList className="grid grid-cols-6 w-full bg-yellow-50 border border-yellow-200">
+            <TabsList className="grid grid-cols-6 w-full bg-yellow-50 dark:bg-yellow-950/50 border border-yellow-200 dark:border-yellow-900/50">
               {TAB_ROW2.map(({ id, label, icon: Icon }) => (
-                <TabsTrigger key={id} value={id} className="flex items-center gap-1.5 text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black data-[state=active]:shadow-sm">
+                <TabsTrigger key={id} value={id} className="flex items-center gap-1.5 text-xs data-[state=active]:bg-yellow-400 data-[state=active]:text-black data-[state=active]:shadow-sm text-yellow-700 dark:text-yellow-500">
                   <Icon className="w-3.5 h-3.5" /> {label}
                 </TabsTrigger>
               ))}
             </TabsList>
             <div className="text-xs text-muted-foreground px-1 mt-3 mb-1 font-medium tracking-wider">GOD MODE POWER</div>
-            <TabsList className="grid grid-cols-5 w-full bg-purple-50 border border-purple-200">
+            <TabsList className="grid grid-cols-6 w-full bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-900/50">
               {TAB_ROW3.map(({ id, label, icon: Icon }) => (
-                <TabsTrigger key={id} value={id} className="flex items-center gap-1.5 text-xs data-[state=active]:bg-purple-500 data-[state=active]:text-white data-[state=active]:shadow-sm">
+                <TabsTrigger key={id} value={id} className="flex items-center gap-1.5 text-xs data-[state=active]:bg-purple-500 data-[state=active]:text-white data-[state=active]:shadow-sm text-purple-700 dark:text-purple-400">
                   <Icon className="w-3.5 h-3.5" /> {label}
                 </TabsTrigger>
               ))}
@@ -2974,6 +3202,7 @@ export default function DevStudio() {
           </TabsContent>
 
           {/* ── GOD MODE POWER: API CONSOLE ── */}
+          <TabsContent value="sql-console"><DatabaseSQLConsole /></TabsContent>
           <TabsContent value="api-console">
             <ApiConsole />
           </TabsContent>

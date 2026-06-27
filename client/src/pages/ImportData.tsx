@@ -113,6 +113,7 @@ export default function ImportData() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Import request failed");
       return res.json();
@@ -147,6 +148,7 @@ export default function ImportData() {
     mutationFn: async (batchId: number) => {
       const res = await fetch(`/api/admin/import/rollback/${batchId}`, {
         method: "POST",
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Rollback request failed");
       return res.json();

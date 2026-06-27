@@ -287,7 +287,7 @@ export default function DynamicPage() {
   const { data: page, isLoading: pageLoading } = useQuery<PageRegistryEntry>({
     queryKey: ["/api/admin/page-registry", slug],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/page-registry`);
+      const res = await fetch(`/api/admin/page-registry`, { credentials: "include" });
       const pages = await res.json();
       return pages.find((p: PageRegistryEntry) => p.slug === slug);
     },

@@ -100,7 +100,7 @@ export default function IDCardGenerator() {
     event: null,
   });
 
-  const { data: devotees = [], isLoading: devoteesLoading } = useQuery<any[]>({
+  const { data: devotees = [], isLoading: devoteesLoading, isError: devoteesError, error: devoteesErr, refetch: refetchDevotees } = useQuery<any[]>({
     queryKey: ["/api/devotees"],
   });
 
@@ -499,7 +499,13 @@ export default function IDCardGenerator() {
             <ScrollArea className="flex-1">
               <div className="p-2 space-y-1">
                 {devoteesLoading && (
-                  <div className="text-center py-8 text-muted-foreground text-sm">Loading...</div>
+                  <div className="text-center py-8 text-muted-foreground text-xs animate-pulse">Loading devotees...</div>
+                )}
+                {devoteesError && (
+                  <div className="p-3 text-center space-y-2 border border-destructive/20 rounded bg-destructive/5 my-2">
+                    <p className="text-destructive text-[11px] font-semibold">Failed to load devotees</p>
+                    <Button size="sm" onClick={() => refetchDevotees()} className="h-6 text-[10px] w-full bg-destructive text-destructive-foreground hover:bg-destructive/90">Try Again</Button>
+                  </div>
                 )}
                 {filteredDevotees.map((d: any) => {
                   const sl = SPIRITUAL_LEVELS[d.spiritualLevel] || SPIRITUAL_LEVELS.default;

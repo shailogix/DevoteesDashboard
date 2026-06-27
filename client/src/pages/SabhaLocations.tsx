@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Search, Plus, Edit, Trash2, MapPin, CalendarDays, Landmark, Phone, Mail, Navigation, MessageSquare } from "lucide-react";
+import { Search, Plus, Edit, Trash2, MapPin, CalendarDays, Landmark, Phone, Mail, Navigation, MessageSquare, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -47,7 +47,7 @@ export default function SabhaLocations() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: locations = [], isLoading } = useQuery<SabhaLocation[]>({ queryKey: ["/api/sabha-locations"] });
+  const { data: locations = [], isLoading, isError, error, refetch } = useQuery<SabhaLocation[]>({ queryKey: ["/api/sabha-locations"] });
   const { data: events = [] } = useQuery<Event[]>({ queryKey: ["/api/events"] });
   const { data: mandals = [] } = useQuery<Mandal[]>({ queryKey: ["/api/mandals"] });
 
@@ -108,6 +108,28 @@ export default function SabhaLocations() {
   const getLocationMandal = (city: string | null) => mandals.find((m: Mandal) => m.name.toLowerCase().includes(city?.toLowerCase() || ""));
 
   if (isLoading) return <LoadingSpinner />;
+
+  if (isError) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6 bg-background">
+        <Card className="max-w-md w-full border-destructive/20 shadow-elevation-2">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" /> Error Loading Sabha Locations
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground text-sm">
+              {error instanceof Error ? error.message : "An unexpected error occurred while loading Sabha locations."}
+            </p>
+            <Button onClick={() => refetch()} className="w-full flex items-center justify-center gap-2">
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-auto p-6 bg-gradient-to-br from-amber-50/20 via-orange-50/10 to-transparent">

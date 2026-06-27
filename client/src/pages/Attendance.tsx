@@ -31,11 +31,12 @@ export default function AttendancePage() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
 
-  const { data: attendanceRaw = [], isLoading: attLoading } = useQuery<Attendance[]>({ queryKey: ["/api/attendance"] });
-  const { data: devotees = [], isLoading: devLoading } = useQuery<Devotee[]>({ queryKey: ["/api/devotees"] });
-  const { data: events = [], isLoading: evtLoading } = useQuery<Event[]>({ queryKey: ["/api/events"] });
+  const { data: attendanceRaw = [], isLoading: attLoading, isError: attError, error: attErr, refetch: attRefetch } = useQuery<Attendance[]>({ queryKey: ["/api/attendance"] });
+  const { data: devotees = [], isLoading: devLoading, isError: devError, error: devErr, refetch: devRefetch } = useQuery<Devotee[]>({ queryKey: ["/api/devotees"] });
+  const { data: events = [], isLoading: evtLoading, isError: evtError, error: evtErr, refetch: evtRefetch } = useQuery<Event[]>({ queryKey: ["/api/events"] });
 
   const isLoading = attLoading || devLoading || evtLoading;
+  const isError = attError || devError || evtError;
 
   const devoteeMap = useMemo(() => {
     const m: Record<number, string> = {};
@@ -124,6 +125,29 @@ export default function AttendancePage() {
   };
 
   if (isLoading) return <div className="flex-1 flex items-center justify-center"><LoadingSpinner size="lg" text="Loading attendance data..." /></div>;
+
+  if (isError) {
+    const errorMsg = (attErr || devErr || evtErr)?.message || "Failed to load database queries.";
+    return (
+      <div className="flex-1 flex items-center justify-center p-6 bg-background">
+        <Card className="max-w-md w-full border-destructive/20 shadow-elevation-2">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" /> Error Loading Attendance
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground text-sm">
+              {errorMsg}
+            </p>
+            <Button onClick={() => { attRefetch(); devRefetch(); evtRefetch(); }} className="w-full flex items-center justify-center gap-2">
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">

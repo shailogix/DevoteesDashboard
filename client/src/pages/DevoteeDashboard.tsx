@@ -25,7 +25,7 @@ export default function DevoteeDashboard() {
   const [isEditing, setIsEditing] = useState(false);
   const [simulatingAlert, setSimulatingAlert] = useState(false);
 
-  const { data: dashboardData, isLoading } = useQuery<any>({
+  const { data: dashboardData, isLoading, isError, error, refetch } = useQuery<any>({
     queryKey: ["/api/devotee/dashboard"],
   });
 
@@ -40,6 +40,7 @@ export default function DevoteeDashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ optionId }),
+        credentials: "include",
       });
       if (!res.ok) {
         const err = await res.json();
@@ -92,6 +93,7 @@ export default function DevoteeDashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answers }),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to submit quiz answers");
       const data = await res.json();
@@ -119,53 +121,83 @@ export default function DevoteeDashboard() {
   const mockYouTubeVideos = [
     {
       id: "v1",
-      title: "Madhur Hari Naam Sankirtan - Hare Krishna Hare Rama kirtan",
-      thumbnail: "https://images.unsplash.com/photo-1609137144813-059942a6c1d7?q=80&w=600&auto=format&fit=crop",
-      duration: "12:45",
-      views: "15K views",
-      publishedAt: "2 days ago",
-      embedId: "dQw4w9WgXcQ",
-      description: "Experience the pure bliss of Hari Naam Sankirtan. Chant along and immerse yourself in divine love."
+      title: "Kalki MahaMantra | Kunti | Madhav Stuti",
+      thumbnail: "https://i.ytimg.com/vi/8334Lb9H7fk/hqdefault.jpg?sqp=-oaymwEiCKgBEF5IWvKriqkDFQgBFQAAAAAYASUAAMhCPQCAokN4AQ==&rs=AOn4CLCvgvCQ7P3ns-HJTJEBgo5Q8t-HrQ",
+      duration: "08:15",
+      views: "185K views",
+      publishedAt: "1 month ago",
+      embedId: "8334Lb9H7fk",
+      description: "Beautiful Kalki MahaMantra chanting from the Kunti chapter of Madhav Stuti, bringing peace and absolute bliss to the listener."
     },
     {
       id: "v2",
-      title: "Shree Madhav Stuti - Morning Devotional Prayers",
-      thumbnail: "https://images.unsplash.com/photo-1545128485-c400e7702796?q=80&w=600&auto=format&fit=crop",
-      duration: "08:20",
-      views: "24K views",
-      publishedAt: "5 days ago",
-      embedId: "h10E_r-qY-Q",
-      description: "Start your day with these sacred morning prayers to Lord Madhav for peace, health, and spiritual strength."
+      title: "Bhavishya Malika Theme Song",
+      thumbnail: "https://i.ytimg.com/vi/McS0xn79v5o/hqdefault.jpg?sqp=-oaymwEiCKgBEF5IWvKriqkDFQgBFQAAAAAYASUAAMhCPQCAokN4AQ==&rs=AOn4CLDDE6RlREvU7rOJP7a9dXleXN4HVw",
+      duration: "05:40",
+      views: "320K views",
+      publishedAt: "2 weeks ago",
+      embedId: "McS0xn79v5o",
+      description: "The official theme song of Bhavishya Malika from the @MadhavStuti channel. Listen to the sacred predictions set to beautiful melodies."
     },
     {
       id: "v3",
-      title: "Divine Bhajans & Kirtans | Live from Madhav Temple",
-      thumbnail: "https://images.unsplash.com/photo-1490730141103-6cac27aaab94?q=80&w=600&auto=format&fit=crop",
-      duration: "45:10",
-      views: "42K views",
-      publishedAt: "1 week ago",
-      embedId: "9gX_U21oN70",
-      description: "Live kirtan session recorded at the main temple hall on the auspicious occasion of Ekadashi."
+      title: "Hey Madhav Madhusudana",
+      thumbnail: "https://i.ytimg.com/vi/j-4zWoBAvhE/hqdefault.jpg?sqp=-oaymwEiCKgBEF5IWvKriqkDFQgBFQAAAAAYASUAAMhCPQCAokN4AQ==&rs=AOn4CLCip1wwdNSQZckCKDdfwkzYLLFPBg",
+      duration: "10:30",
+      views: "98K views",
+      publishedAt: "10 days ago",
+      embedId: "j-4zWoBAvhE",
+      description: "Soulful and meditative prayer 'Hey Madhav Madhusudana' calling upon Lord Krishna. A divine experience for meditation and morning worship."
     },
     {
       id: "v4",
-      title: "Spiritual Discourse: Path of Bhakti and Devotion",
-      thumbnail: "https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?q=80&w=600&auto=format&fit=crop",
-      duration: "18:15",
-      views: "9.8K views",
-      publishedAt: "1 week ago",
-      embedId: "q6hT_O4HmgM",
-      description: "A profound lecture explaining the stages of Bhakti Yoga and how to cultivate steady spiritual practices in daily life."
+      title: "Arjun ke Madhav Mere Madhav",
+      thumbnail: "https://i.ytimg.com/vi/OCAFui8RNqU/hqdefault.jpg?sqp=-oaymwEiCKgBEF5IWvKriqkDFQgBFQAAAAAYASUAAMhCPQCAokN4AQ==&rs=AOn4CLArdQCOfSODgagyGGGz7fpxWZMQGQ",
+      duration: "12:45",
+      views: "145K views",
+      publishedAt: "3 days ago",
+      embedId: "OCAFui8RNqU",
+      description: "A gorgeous bhajan depicting the divine relationship between Arjuna and his Madhav. Immerse yourself in the nectar of Bhagavad Gita devotion."
     },
     {
       id: "v5",
-      title: "Evening Aarti & Meditation | Madhavstuti Channel",
-      thumbnail: "https://images.unsplash.com/photo-1447069387593-a5de0862481e?q=80&w=600&auto=format&fit=crop",
-      duration: "10:30",
-      views: "18K views",
-      publishedAt: "2 weeks ago",
-      embedId: "Y2wLIsVqKco",
-      description: "Join the congregational evening offering and meditation session. Let your mind find supreme tranquility."
+      title: "Madhav Madhav Geet - Prahlad || माधव माधव गीत - प्रह्लाद",
+      thumbnail: "https://i.ytimg.com/vi/20xRcAmK8S8/hqdefault.jpg?sqp=-oaymwEiCKgBEF5IWvKriqkDFQgBFQAAAAAYASUAAMhCPQCAokN4AQ==&rs=AOn4CLCJygqJI0SfDrs5DKQr5xab4zcSOw",
+      duration: "06:50",
+      views: "75K views",
+      publishedAt: "5 days ago",
+      embedId: "20xRcAmK8S8",
+      description: "Chant the sweet name of Lord Madhav with the innocence of Bhakta Prahlad. A divine song dedicated to the protection of devotees."
+    },
+    {
+      id: "v6",
+      title: "Madhav Maha Mantra - Dhruv",
+      thumbnail: "https://i.ytimg.com/vi/__AHxn7bw_U/hqdefault.jpg?sqp=-oaymwEiCKgBEF5IWvKriqkDFQgBFQAAAAAYASUAAMhCPQCAokN4AQ==&rs=AOn4CLCN_ycf_QmMe2iQ50SEEdsVC1kwjg",
+      duration: "09:15",
+      views: "210K views",
+      publishedAt: "3 weeks ago",
+      embedId: "__AHxn7bw_U",
+      description: "Sacred chanting of Madhav Maha Mantra from the Dhruv chapter. Connect with divine cosmic energy and achieve absolute mindfulness."
+    },
+    {
+      id: "v7",
+      title: "Madhav Naam Dhun - Meera",
+      thumbnail: "https://i.ytimg.com/vi/jB6rJhRR4bw/hqdefault.jpg?sqp=-oaymwEiCKgBEF5IWvKriqkDFQgBFQAAAAAYASUAAMhCPQCAokN4AQ==&rs=AOn4CLBjv8z32meK9Cfwph-xpBwEosUA6g",
+      duration: "11:20",
+      views: "85K views",
+      publishedAt: "4 days ago",
+      embedId: "jB6rJhRR4bw",
+      description: "Beautiful bhajan capturing Mira Bai's eternal love and devotion for Lord Krishna. Soul-stirring kirtan for meditation and evening prayers."
+    },
+    {
+      id: "v8",
+      title: "Kalki Maha Mantra - Gargi",
+      thumbnail: "https://i.ytimg.com/vi/Q_XnhE6zWno/hqdefault.jpg?sqp=-oaymwEiCKgBEF5IWvKriqkDFQgBFQAAAAAYASUAAMhCPQCAokN4AQ==&rs=AOn4CLDAw1UF0xg9ODN1XjiEcbp7rT_2IQ",
+      duration: "07:45",
+      views: "120K views",
+      publishedAt: "2 months ago",
+      embedId: "Q_XnhE6zWno",
+      description: "Divine recitation of Kalki Maha Mantra by Gargi. Invoke peace, spiritual growth, and purification of the mind and body."
     }
   ];
 
@@ -183,7 +215,7 @@ export default function DevoteeDashboard() {
   const triggerAlertCheck = async () => {
     setSimulatingAlert(true);
     try {
-      const res = await fetch("/api/panchang/check-alerts", { method: "POST" });
+      const res = await fetch("/api/panchang/check-alerts", { method: "POST", credentials: "include" });
       if (!res.ok) throw new Error("Failed to dispatch alert");
       const data = await res.json();
       
@@ -213,6 +245,7 @@ export default function DevoteeDashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to submit profile update");
       return res.json();
@@ -233,7 +266,7 @@ export default function DevoteeDashboard() {
     },
   });
 
-  if (isLoading || !dashboardData) {
+  if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-background particle-bg">
         <div className="text-center space-y-5 animate-fade-in-up">
@@ -248,6 +281,28 @@ export default function DevoteeDashboard() {
             <p className="text-muted-foreground text-sm font-medium">Loading Devotee Portal…</p>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (isError || !dashboardData) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-background p-6">
+        <Card className="max-w-md w-full border-destructive/20 shadow-elevation-2">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" /> Error Loading Portal
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground text-sm">
+              {error instanceof Error ? error.message : "An unexpected error occurred while loading your profile."}
+            </p>
+            <Button onClick={() => refetch()} className="w-full flex items-center justify-center gap-2">
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -1075,6 +1130,7 @@ export default function DevoteeDashboard() {
                     <div className="flex gap-4">
                       <span>Views: <strong>{selectedVideo.views}</strong></span>
                       <span>Published: <strong>{selectedVideo.publishedAt || "Recently"}</strong></span>
+                      <span>Channel: <a href="https://www.youtube.com/@MadhavStuti" target="_blank" rel="noopener noreferrer" className="hover:underline font-bold text-amber-600">@MadhavStuti</a></span>
                     </div>
                     <a 
                       href={`https://www.youtube.com/watch?v=${selectedVideo.embedId}`}

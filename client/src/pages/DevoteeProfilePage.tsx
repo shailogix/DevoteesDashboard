@@ -67,39 +67,33 @@ export default function DevoteeProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [docType, setDocType] = useState("Aadhaar Card");
 
-  const { data: devotee, isLoading: devoteeLoading } = useQuery<Devotee>({
-    queryKey: ["/api/devotees", id],
-    queryFn: () => fetch(`/api/devotees/${id}`).then(r => r.json()),
+  const { data: devotee, isLoading: devoteeLoading, isError, error, refetch } = useQuery<Devotee>({
+    queryKey: [`/api/devotees/${id}`],
     enabled: !!id,
   });
 
   const { data: familyMembers = [] } = useQuery<Devotee[]>({
-    queryKey: ["/api/devotees", id, "family"],
-    queryFn: () => fetch(`/api/devotees/${id}/family`).then(r => r.json()),
+    queryKey: [`/api/devotees/${id}/family`],
     enabled: !!id,
   });
 
   const { data: analytics } = useQuery<{ attendance: any[], donations: any[], volunteering: any[] }>({
-    queryKey: ["/api/devotees", id, "analytics"],
-    queryFn: () => fetch(`/api/devotees/${id}/analytics`).then(r => r.json()),
+    queryKey: [`/api/devotees/${id}/analytics`],
     enabled: !!id,
   });
 
   const { data: documents = [] } = useQuery<DevoteeDoc[]>({
-    queryKey: ["/api/devotees", id, "documents"],
-    queryFn: () => fetch(`/api/devotees/${id}/documents`).then(r => r.json()),
+    queryKey: [`/api/devotees/${id}/documents`],
     enabled: !!id,
   });
 
   const { data: groups = [] } = useQuery<any[]>({
-    queryKey: ["/api/devotees", id, "groups"],
-    queryFn: () => fetch(`/api/devotees/${id}/groups`).then(r => r.json()),
+    queryKey: [`/api/devotees/${id}/groups`],
     enabled: !!id,
   });
 
   const { data: mandal } = useQuery<any>({
-    queryKey: ["/api/devotees", id, "mandal"],
-    queryFn: () => fetch(`/api/devotees/${id}/mandal`).then(r => r.json()),
+    queryKey: [`/api/devotees/${id}/mandal`],
     enabled: !!id,
   });
 
@@ -107,7 +101,7 @@ export default function DevoteeProfilePage() {
     mutationFn: async ({ type, filename, base64 }: { type: string; filename: string; base64: string }) =>
       adminFetch(`/api/devotees/${id}/documents`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, filename, base64 }) }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/devotees", id, "documents"] });
+      qc.invalidateQueries({ queryKey: [`/api/devotees/${id}/documents`] });
       toast({ title: "Document uploaded", description: "Document saved successfully." });
     },
     onError: () => toast({ title: "Upload failed. Developer mode required to upload documents.", variant: "destructive" }),
@@ -116,7 +110,7 @@ export default function DevoteeProfilePage() {
   const deleteDocMutation = useMutation({
     mutationFn: async (docId: string) => adminFetch(`/api/devotees/${id}/documents/${docId}`, { method: "DELETE" }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/devotees", id, "documents"] });
+      qc.invalidateQueries({ queryKey: [`/api/devotees/${id}/documents`] });
       toast({ title: "Document deleted" });
     },
     onError: () => toast({ title: "Delete failed. Developer mode required.", variant: "destructive" }),
@@ -142,6 +136,28 @@ export default function DevoteeProfilePage() {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6 bg-background">
+        <Card className="max-w-md w-full border-destructive/20 shadow-elevation-2">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" /> Error Loading Profile
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground text-sm">
+              {error instanceof Error ? error.message : "An unexpected error occurred while loading this devotee profile."}
+            </p>
+            <Button onClick={() => refetch()} className="w-full flex items-center justify-center gap-2">
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!devotee) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -153,7 +169,7 @@ export default function DevoteeProfilePage() {
               <ArrowLeft className="w-4 h-4 mr-2" /> Back to Devotees
             </Button>
           ) : (
-            <Button onClick={() => navigate("/families/my-family")}>
+            <Button onClick={() => navigate("/my-family")}>
               <ArrowLeft className="w-4 h-4 mr-2" /> Back to My Family
             </Button>
           )}
@@ -234,7 +250,7 @@ export default function DevoteeProfilePage() {
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Devotees
           </Button>
         ) : (
-          <Button variant="ghost" onClick={() => navigate("/families/my-family")} className="mb-2">
+          <Button variant="ghost" onClick={() => navigate("/my-family")} className="mb-2">
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to My Family
           </Button>
         )}

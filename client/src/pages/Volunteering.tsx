@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { HandHeart, Plus, Clock, Award, Users, Activity, Edit, Trash2, Calendar, Search, ChevronLeft, ChevronRight, MapPin, RefreshCw } from "lucide-react";
+import { HandHeart, Plus, Clock, Award, Users, Activity, Edit, Trash2, Calendar, Search, ChevronLeft, ChevronRight, MapPin, RefreshCw, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
@@ -270,7 +270,7 @@ export default function VolunteeringPage() {
     capacity: 5,
   });
 
-  const { data: records = [], isLoading } = useQuery<VolRecord[]>({ queryKey: ["/api/volunteering"] });
+  const { data: records = [], isLoading, isError, error, refetch } = useQuery<VolRecord[]>({ queryKey: ["/api/volunteering"] });
   const { data: devotees = [] } = useQuery<Devotee[]>({ queryKey: ["/api/devotees"] });
   
   const { data: shifts = [], isLoading: shiftsLoading } = useQuery<VolunteeringShift[]>({ 
@@ -402,6 +402,28 @@ export default function VolunteeringPage() {
   };
 
   if (isLoading) return <div className="flex-1 flex items-center justify-center"><LoadingSpinner size="lg" text="Loading volunteering records..." /></div>;
+
+  if (isError) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6 bg-background">
+        <Card className="max-w-md w-full border-destructive/20 shadow-elevation-2">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" /> Error Loading Volunteering
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground text-sm">
+              {error instanceof Error ? error.message : "An unexpected error occurred while loading volunteering data."}
+            </p>
+            <Button onClick={() => refetch()} className="w-full flex items-center justify-center gap-2">
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">

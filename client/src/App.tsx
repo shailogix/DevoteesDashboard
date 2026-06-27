@@ -173,6 +173,7 @@ function PendingApprovalScreen({ logout }: { logout: () => void }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
+        credentials: "include",
       });
       const data = await res.json();
       if (!res.ok) {
@@ -370,7 +371,7 @@ function AppContent() {
           <Switch>
             <Route path="/" component={(isAdmin || isLeader) ? Dashboard : DevoteeDashboard} />
             <Route path="/devotees/my-profile" component={DevoteeProfilePage} />
-            <Route path="/families/my-family" component={MyFamilyPage} />
+            <Route path="/my-family" component={MyFamilyPage} />
             <Route path="/devotees">
               <LeaderRoute component={Devotees} />
             </Route>

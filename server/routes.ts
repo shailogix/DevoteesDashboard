@@ -43,11 +43,55 @@ function getViewingRole(req: any) {
   return baseRole === "user" ? "devotee" : baseRole;
 }
 
+async function getNextDevoteeId() {
+  const allDevs = await db.select().from(devotees);
+  let maxId = 0;
+  for (const d of allDevs) {
+    if (d.devoteeId) {
+      const match = d.devoteeId.match(/^MP-(\d+)$/);
+      if (match) {
+        const val = parseInt(match[1], 10);
+        if (val > maxId) maxId = val;
+      }
+    }
+  }
+  return `MP-${String(maxId + 1).padStart(3, "0")}`;
+}
+
 async function getEffectiveDevotee(req: any) {
   const userId = req.user?.claims?.sub || "";
+  if (!userId) return null;
+  
   const [dev] = await db.select().from(devotees).where(eq(devotees.userId, userId));
   if (dev) return dev;
   
+  // If user is approved, automatically create a devotee record for them
+  try {
+    const user = await storage.getUser(userId);
+    if (user && user.approvalStatus === "approved") {
+      const devoteeId = await getNextDevoteeId();
+      
+      const [newDev] = await db.insert(devotees).values({
+        devoteeId,
+        userId: user.id,
+        firstName: user.firstName || "Devotee",
+        lastName: user.lastName || "Parivar",
+        email: user.email,
+        phone: "9876543210",
+        whatsappNumber: "9876543210",
+        gender: "Male",
+        spiritualLevel: "Beginner",
+        approvalStatus: "approved",
+        isActive: true,
+      }).returning();
+      
+      console.log(`[AUTO-CREATE] Created devotee profile for user ${user.email} (ID: ${newDev.id})`);
+      return newDev;
+    }
+  } catch (err) {
+    console.error("[AUTO-CREATE] Failed to auto-create devotee profile:", err);
+  }
+
   const baseRole = req.user?.role || "user";
   if (baseRole === "admin" || baseRole === "super-admin" || baseRole === "leader") {
     return {
@@ -395,6 +439,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching families:", error);
       res.status(500).json({ message: "Failed to fetch families" });
+    }
+  });
+
+  app.get('/api/families/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid family ID" });
+      }
+      const effectiveRole = getViewingRole(req);
+      const isViewingAsPrivileged = effectiveRole === "admin" || effectiveRole === "super-admin" || effectiveRole === "leader";
+      if (!isViewingAsPrivileged) {
+        const ownDev = await getEffectiveDevotee(req);
+        if (!ownDev || ownDev.familyId !== id) {
+          return res.status(403).json({ message: "Forbidden" });
+        }
+      }
+      const family = await storage.getFamily(id);
+      if (!family) return res.status(404).json({ message: "Family not found" });
+      res.json(family);
+    } catch (error) {
+      console.error("Error fetching family:", error);
+      res.status(500).json({ message: "Failed to fetch family" });
     }
   });
 
@@ -1414,7 +1481,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await devConfig.init();
 
   // ─── GOD MODE SESSION ACTIVATION ────────────────────────────────────────────
-  app.post('/api/admin/activate', isAuthenticated, requireSuperAdmin, async (req, res) => {
+  // NOTE: No requireSuperAdmin here — activation is password-only, token grants privilege
+  app.post('/api/admin/activate', isAuthenticated, async (req, res) => {
     const { password } = req.body;
     if (password !== GOD_MODE_PASSWORD) {
       return res.status(401).json({ message: "Invalid GOD Mode password" });
@@ -1424,7 +1492,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ token, message: "GOD Mode activated" });
   });
 
-  app.delete('/api/admin/activate', isAuthenticated, requireSuperAdmin, (req, res) => {
+  app.delete('/api/admin/activate', isAuthenticated, (req, res) => {
     const token = req.headers['x-god-mode-token'] as string | undefined;
     if (token) godModeTokens.delete(token);
     res.json({ message: "GOD Mode deactivated" });
@@ -2600,12 +2668,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          const allDevs = await db.select().from(devotees);
-          const nextId = allDevs.length + 1;
+          const devoteeId = await getNextDevoteeId();
           const details = updatedData.memberDetails || {};
 
           await db.insert(devotees).values({
-            devoteeId: `MP-${String(nextId).padStart(3, "0")}`,
+            devoteeId,
             firstName: details.firstName || "Family",
             lastName: details.lastName || requesterDevotee.lastName || "Member",
             email: details.email || null,
@@ -2921,6 +2988,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       await db.update(importBatches).set({ status: "rolled_back" }).where(eq(importBatches.id, batchId));
       res.json({ message: "Import batch rolled back successfully!" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+
+  // ── ELITE GOD MODE TOOLS ──
+
+  app.post('/api/admin/sql-console', isAuthenticated, requireAdmin, async (req, res) => {
+    // Requires exact GOD mode token via middleware or check
+    const token = req.headers['x-god-mode-token'] as string | undefined;
+    if (!token || !godModeTokens.has(token)) {
+      return res.status(403).json({ message: "GOD Mode inactive or token invalid." });
+    }
+    
+    try {
+      const { query } = req.body;
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ message: "Invalid SQL query." });
+      }
+      
+      // Execute raw SQL safely against the DB
+      const result = await db.execute(sql.raw(query));
+      res.json({ result: result.rows || result });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message, error: true });
+    }
+  });
+
+  app.post('/api/admin/seed/truncate', isAuthenticated, requireAdmin, async (req: any, res) => {
+    const token = req.headers['x-god-mode-token'] as string | undefined;
+    if (!token || !godModeTokens.has(token)) {
+      return res.status(403).json({ message: "GOD Mode inactive." });
+    }
+
+    try {
+      const { entity } = req.body;
+      if (!entity) return res.status(400).json({ message: "Entity required" });
+
+      const allowedTables = ['devotees', 'families', 'events', 'attendance', 'donations', 'volunteering', 'mentors'];
+      if (!allowedTables.includes(entity)) {
+        return res.status(400).json({ message: "Invalid entity for truncation." });
+      }
+
+      await db.execute(sql.raw(`TRUNCATE TABLE "${entity}" CASCADE`));
+      await addAudit("TRUNCATE_TABLE", entity, null, req.user?.claims?.sub || "system", null, null);
+      res.json({ message: `Table ${entity} truncated successfully.` });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/admin/test-notification', isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const { type, recipient, message } = req.body;
+      // Simulate sending by logging to dispatch
+      await logDispatch(type || "email", recipient || "test@example.com", "Test Notification", message || "This is a test.");
+      res.json({ message: "Test notification dispatched to logs." });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

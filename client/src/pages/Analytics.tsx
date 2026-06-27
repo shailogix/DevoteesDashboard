@@ -9,7 +9,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, Legend
 } from 'recharts';
-import { TrendingUp, Users, Heart, Calendar, Activity, Download, CreditCard, Clock, MapPin } from "lucide-react";
+import { TrendingUp, Users, Heart, Calendar, Activity, Download, CreditCard, Clock, MapPin, AlertCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,7 +54,7 @@ interface DonationSummary {
 export default function Analytics() {
   const [, navigate] = useLocation();
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const { data: analyticsRaw, isLoading } = useQuery<AnalyticsData>({ queryKey: ["/api/analytics"] });
+  const { data: analyticsRaw, isLoading, isError, error, refetch } = useQuery<AnalyticsData>({ queryKey: ["/api/analytics"] });
   const { data: devotees = [] } = useQuery<DevoteeSummary[]>({ queryKey: ["/api/devotees"] });
   const { data: events = [] } = useQuery<EventSummary[]>({ queryKey: ["/api/events"] });
   const { data: donations = [] } = useQuery<DonationSummary[]>({ queryKey: ["/api/donations"] });
@@ -163,6 +163,28 @@ export default function Analytics() {
             <p className="text-muted-foreground text-sm font-medium">Loading Analytics Insights…</p>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6 bg-background">
+        <Card className="max-w-md w-full border-destructive/20 shadow-elevation-2">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" /> Error Loading Analytics
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground text-sm">
+              {error instanceof Error ? error.message : "An unexpected error occurred while loading analytics."}
+            </p>
+            <Button onClick={() => refetch()} className="w-full flex items-center justify-center gap-2">
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

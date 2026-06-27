@@ -220,7 +220,7 @@ export function Sidebar() {
         return { ...item, name: "My Profile", href: "/devotees/my-profile" };
       }
       if (item.id === "families") {
-        return { ...item, name: "My Family", href: "/families/my-family" };
+        return { ...item, name: "My Family", href: "/my-family" };
       }
       if (item.id === "donations") {
         return { ...item, name: "My Donations", href: "/donations" };

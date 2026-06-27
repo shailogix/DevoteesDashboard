@@ -56,7 +56,7 @@ export function ThemeSelector() {
         <DropdownMenuTrigger asChild>
           <Button 
             variant="outline" 
-            className="w-full justify-between h-9 text-xs px-3 border-border/80 hover:bg-muted/40 font-semibold rounded-xl flex items-center gap-2 group"
+            className="w-full justify-between h-9 text-xs px-3 border-border/80 bg-[var(--surface-container-high)] hover:bg-[var(--surface-container-highest)] text-foreground font-semibold rounded-xl flex items-center gap-2 group shadow-sm"
           >
             <div className="flex items-center gap-2 min-w-0">
               <span className={`w-3.5 h-3.5 rounded-full bg-gradient-to-br ${currentVisual?.gradient || "from-primary to-secondary"} shadow-sm shrink-0`} />
@@ -65,7 +65,11 @@ export function ThemeSelector() {
             <ChevronDown className="w-3.5 h-3.5 text-muted-foreground group-data-[state=open]:rotate-180 transition-transform duration-200" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-[190px] p-1.5 rounded-2xl border border-border/60 bg-[var(--surface-container-high,var(--card))] shadow-elevation-3 z-50">
+        <DropdownMenuContent 
+          align="start" 
+          className="w-[190px] p-1.5 rounded-2xl border border-border/60 shadow-elevation-3 z-50"
+          style={{ backgroundColor: 'var(--popover)', opacity: 1, backdropFilter: 'none' }}
+        >
           {themes.map((t) => {
             const visual = THEME_VISUALS[t.value];
             const isActive = theme === t.value;

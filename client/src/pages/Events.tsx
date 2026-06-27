@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/Layout/Header";
 import { LoadingSpinner } from "@/components/Common/LoadingSpinner";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { CalendarDays, Plus, MapPin, Users, Clock, Edit, Trash2, Archive, ArchiveRestore, Image, Search, Eye } from "lucide-react";
+import { CalendarDays, Plus, MapPin, Users, Clock, Edit, Trash2, Archive, ArchiveRestore, Image, Search, Eye, AlertCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -280,7 +280,7 @@ export default function Events() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
 
-  const { data: events = [], isLoading } = useQuery<Event[]>({ queryKey: ["/api/events"] });
+  const { data: events = [], isLoading, isError, error, refetch } = useQuery<Event[]>({ queryKey: ["/api/events"] });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/events/${id}`),
@@ -327,6 +327,28 @@ export default function Events() {
       <LoadingSpinner size="lg" text="Loading events..." />
     </div>
   );
+
+  if (isError) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6 bg-background">
+        <Card className="max-w-md w-full border-destructive/20 shadow-elevation-2">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" /> Error Loading Events
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground text-sm">
+              {error instanceof Error ? error.message : "An unexpected error occurred while loading events."}
+            </p>
+            <Button onClick={() => refetch()} className="w-full flex items-center justify-center gap-2">
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">

@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Search, Plus, Edit, Trash2, GraduationCap, Users, Star, Clock } from "lucide-react";
+import { Search, Plus, Edit, Trash2, GraduationCap, Users, Star, Clock, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
@@ -52,7 +52,7 @@ export default function Mentors() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
 
-  const { data: mentors = [], isLoading } = useQuery<Mentor[]>({ queryKey: ["/api/mentors"] });
+  const { data: mentors = [], isLoading, isError, error, refetch } = useQuery<Mentor[]>({ queryKey: ["/api/mentors"] });
   const { data: devotees = [] } = useQuery<Devotee[]>({ queryKey: ["/api/devotees"] });
 
   const getDevoteeName = (id: number | null | undefined) => {
@@ -143,6 +143,28 @@ export default function Mentors() {
   const totalMentees = mentors.reduce((sum: number, m: Mentor) => sum + (m.currentMentees || 0), 0);
 
   if (isLoading) return <div className="flex-1 flex items-center justify-center"><LoadingSpinner size="lg" text="Loading mentors..." /></div>;
+
+  if (isError) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6 bg-background">
+        <Card className="max-w-md w-full border-destructive/20 shadow-elevation-2">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" /> Error Loading Mentors
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground text-sm">
+              {error instanceof Error ? error.message : "An unexpected error occurred while loading mentors."}
+            </p>
+            <Button onClick={() => refetch()} className="w-full flex items-center justify-center gap-2">
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">

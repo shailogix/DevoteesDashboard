@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
-import { Building, Phone, Mail, Award, Calendar, ArrowRight, MapPin, Briefcase, Plus, UserPlus } from "lucide-react";
+import { Building, Phone, Mail, Award, Calendar, ArrowRight, MapPin, Briefcase, Plus, UserPlus, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,7 @@ export default function MyFamilyPage() {
     relation: "Spouse",
   });
 
-  const { data: dashboardData, isLoading, refetch } = useQuery<any>({
+  const { data: dashboardData, isLoading, isError, error, refetch } = useQuery<any>({
     queryKey: ["/api/devotee/dashboard"],
   });
 
@@ -74,7 +74,7 @@ export default function MyFamilyPage() {
     });
   };
 
-  if (isLoading || !dashboardData) {
+  if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-background particle-bg">
         <div className="text-center space-y-5 animate-pulse">
@@ -89,6 +89,31 @@ export default function MyFamilyPage() {
             <p className="text-muted-foreground text-sm font-medium">Loading Family records…</p>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (isError || !dashboardData) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-background p-6">
+        <Card className="max-w-md w-full border-destructive/20 shadow-elevation-2">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" /> Error Loading Family Unit
+            </CardTitle>
+            <CardDescription>
+              Failed to retrieve your family profile from the server.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground text-sm">
+              {error instanceof Error ? error.message : "An unexpected error occurred while fetching your details."}
+            </p>
+            <Button onClick={() => refetch()} className="w-full flex items-center justify-center gap-2">
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

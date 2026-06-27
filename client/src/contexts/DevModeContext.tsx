@@ -30,6 +30,7 @@ interface DevModeContextType {
   godModeToken: string | null;
   activateDevMode: () => void;
   deactivateDevMode: () => void;
+  deactivateGodMode: () => void;
   showDevLogin: () => void;
 }
 
@@ -59,6 +60,21 @@ export function DevModeProvider({ children }: { children: React.ReactNode }) {
     _godModeToken = null;
     setToken(null);
     setIsDevMode(false);
+  }, []);
+
+  const deactivateGodMode = useCallback(async () => {
+    const token = _godModeToken;
+    if (token) {
+      try {
+        await fetch('/api/admin/activate', {
+          method: 'DELETE',
+          headers: { 'X-God-Mode-Token': token },
+          credentials: 'include',
+        });
+      } catch {}
+    }
+    _godModeToken = null;
+    setToken(null);
   }, []);
 
   const showDevLogin = useCallback(() => { setShowLogin(true); setCode(""); setError(""); }, []);
@@ -96,25 +112,42 @@ export function DevModeProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <DevModeContext.Provider value={{ isDevMode, godModeToken, activateDevMode, deactivateDevMode, showDevLogin }}>
+    <DevModeContext.Provider value={{ isDevMode, godModeToken, activateDevMode, deactivateDevMode, deactivateGodMode, showDevLogin }}>
       {children}
 
       {/* Dev Mode Active Banner */}
       {isDevMode && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-black flex items-center justify-between px-3 py-1 text-xs font-medium shadow-md">
+        <div className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-3 py-1 text-xs font-medium shadow-md transition-colors ${godModeToken ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-zinc-200'}`}>
           <div className="flex items-center gap-2">
             <Code2 className="w-3.5 h-3.5" />
             <span className="font-bold tracking-wide">DEVELOPER MODE</span>
-            <Badge className="bg-black text-yellow-400 text-[10px] px-1.5 py-0 ml-0.5">DevelopZ</Badge>
-            <span className="text-black/60 hidden sm:inline">— Full system configuration enabled</span>
+            {godModeToken ? (
+              <Badge className="bg-black text-yellow-400 text-[10px] px-1.5 py-0 ml-0.5">DevelopZ</Badge>
+            ) : (
+              <Badge className="bg-zinc-600 text-zinc-300 text-[10px] px-1.5 py-0 ml-0.5">LOCKED</Badge>
+            )}
+            <span className={`hidden sm:inline ${godModeToken ? 'text-black/60' : 'text-zinc-400'}`}>
+              — {godModeToken ? 'Full system configuration enabled' : 'GOD Mode inactive. Config is locked.'}
+            </span>
           </div>
           <div className="flex items-center gap-1">
             <Link href="/dev-studio">
-              <button className="flex items-center gap-1 px-2 py-0.5 rounded bg-black/15 hover:bg-black/25 text-black text-xs font-semibold transition-colors" data-testid="banner-link-dev-studio">
+              <button className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold transition-colors ${godModeToken ? 'bg-black/15 hover:bg-black/25 text-black' : 'bg-white/10 hover:bg-white/20 text-white'}`} data-testid="banner-link-dev-studio">
                 <Layers className="w-3 h-3" /> Dev Studio
               </button>
             </Link>
-            <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-black hover:bg-black/15 border border-black/20 ml-1" onClick={deactivateDevMode} data-testid="banner-button-exit-dev-mode">
+            
+            {godModeToken ? (
+              <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-black hover:bg-black/15 border border-black/20 ml-1" onClick={deactivateGodMode}>
+                Lock
+              </Button>
+            ) : (
+              <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-zinc-200 hover:bg-white/10 border border-white/20 ml-1" onClick={showDevLogin}>
+                Unlock
+              </Button>
+            )}
+
+            <Button size="sm" variant="ghost" className={`h-6 px-2 text-xs border ml-1 ${godModeToken ? 'text-black hover:bg-black/15 border-black/20' : 'text-zinc-200 hover:bg-white/10 border-white/20'}`} onClick={deactivateDevMode} data-testid="banner-button-exit-dev-mode">
               <X className="w-2.5 h-2.5 mr-1" /> Exit
             </Button>
           </div>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/Layout/Header";
+import { LoadingSpinner } from "@/components/Common/LoadingSpinner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -8,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { HelpCircle, BarChart3, Plus, Vote, Trophy, Check, Radio } from "lucide-react";
+import { HelpCircle, BarChart3, Plus, Vote, Trophy, Check, Radio, AlertCircle } from "lucide-react";
 
 export default function PollsQuizzes() {
   const { toast } = useToast();
@@ -20,8 +21,8 @@ export default function PollsQuizzes() {
   const [showCreateQuiz, setShowCreateQuiz] = useState(false);
 
   // Load Polls and Quizzes
-  const { data: polls = [], isLoading: loadingPolls } = useQuery<any[]>({ queryKey: ["/api/polls"] });
-  const { data: quizzes = [], isLoading: loadingQuizzes } = useQuery<any[]>({ queryKey: ["/api/quizzes"] });
+  const { data: polls = [], isLoading: loadingPolls, isError: pollsError, error: pollsErr, refetch: refetchPolls } = useQuery<any[]>({ queryKey: ["/api/polls"] });
+  const { data: quizzes = [], isLoading: loadingQuizzes, isError: quizzesError, error: quizzesErr, refetch: refetchQuizzes } = useQuery<any[]>({ queryKey: ["/api/quizzes"] });
 
   // Creation State
   const [pollForm, setPollForm] = useState({ title: "", description: "", option1: "", option2: "", option3: "" });
@@ -41,6 +42,7 @@ export default function PollsQuizzes() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ optionId }),
+        credentials: "include",
       });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
@@ -60,6 +62,7 @@ export default function PollsQuizzes() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answers }),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Quiz submission failed");
       return res.json();
@@ -76,6 +79,7 @@ export default function PollsQuizzes() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
+        credentials: "include",
       });
       return res.json();
     },
@@ -93,6 +97,7 @@ export default function PollsQuizzes() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
+        credentials: "include",
       });
       return res.json();
     },
@@ -263,82 +268,106 @@ export default function PollsQuizzes() {
 
         {/* Content Renderers */}
         {activeTab === "polls" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {polls.length === 0 ? (
-              <div className="col-span-2 text-center py-12 text-muted-foreground text-sm">No polls published yet</div>
+          <div>
+            {loadingPolls ? (
+              <div className="flex justify-center items-center py-12">
+                <LoadingSpinner size="lg" text="Loading polls..." />
+              </div>
+            ) : pollsError ? (
+              <Card className="border-destructive/20 p-6 text-center">
+                <p className="text-destructive text-sm font-semibold mb-2 flex items-center justify-center gap-1.5"><AlertCircle className="w-4 h-4" /> Failed to load polls</p>
+                <p className="text-muted-foreground text-xs mb-4">{(pollsErr as any)?.message || "An unexpected error occurred."}</p>
+                <Button size="sm" onClick={() => refetchPolls()}>Try Again</Button>
+              </Card>
+            ) : polls.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground text-sm">No polls published yet</div>
             ) : (
-              polls.map((poll) => {
-                const totalVotes = poll.responses?.length || 0;
-                return (
-                  <Card key={poll.id} className="border border-border/40 hover:shadow-md transition-shadow">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-bold text-foreground">{poll.title}</CardTitle>
-                      <CardDescription className="text-xs">{poll.description || "Community opinion poll"}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        {poll.options?.map((opt: any) => {
-                          const optVotes = poll.responses?.filter((r: any) => r.optionId === opt.id).length || 0;
-                          const pct = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
-                          return (
-                            <div key={opt.id} className="space-y-1">
-                              <button
-                                onClick={() => voteMutation.mutate({ pollId: poll.id, optionId: opt.id })}
-                                className="w-full flex justify-between items-center text-xs p-2.5 rounded-lg border border-border/50 hover:bg-muted/40 text-left transition-colors font-medium"
-                              >
-                                <span className="flex items-center gap-2"><Radio className="w-3.5 h-3.5 text-primary" /> {opt.optionText}</span>
-                                <span className="text-[10px] text-muted-foreground">{optVotes} votes ({pct}%)</span>
-                              </button>
-                              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                                <div className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full" style={{ width: `${pct}%` }}></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {polls.map((poll) => {
+                  const totalVotes = poll.responses?.length || 0;
+                  return (
+                    <Card key={poll.id} className="border border-border/40 hover:shadow-md transition-shadow">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-bold text-foreground">{poll.title}</CardTitle>
+                        <CardDescription className="text-xs">{poll.description || "Community opinion poll"}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                          {poll.options?.map((opt: any) => {
+                            const optVotes = poll.responses?.filter((r: any) => r.optionId === opt.id).length || 0;
+                            const pct = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
+                            return (
+                              <div key={opt.id} className="space-y-1">
+                                <button
+                                  onClick={() => voteMutation.mutate({ pollId: poll.id, optionId: opt.id })}
+                                  className="w-full flex justify-between items-center text-xs p-2.5 rounded-lg border border-border/50 hover:bg-muted/40 text-left transition-colors font-medium"
+                                >
+                                  <span className="flex items-center gap-2"><Radio className="w-3.5 h-3.5 text-primary" /> {opt.optionText}</span>
+                                  <span className="text-[10px] text-muted-foreground">{optVotes} votes ({pct}%)</span>
+                                </button>
+                                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                                  <div className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full" style={{ width: `${pct}%` }}></div>
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <p className="text-[10px] text-muted-foreground text-right">Total Votes: {totalVotes}</p>
-                    </CardContent>
-                  </Card>
-                );
-              })
+                            );
+                          })}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground text-right">Total Votes: {totalVotes}</p>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
             )}
           </div>
         ) : (
-          <div className="space-y-6">
-            {quizzes.length === 0 ? (
+          <div>
+            {loadingQuizzes ? (
+              <div className="flex justify-center items-center py-12">
+                <LoadingSpinner size="lg" text="Loading quizzes..." />
+              </div>
+            ) : quizzesError ? (
+              <Card className="border-destructive/20 p-6 text-center">
+                <p className="text-destructive text-sm font-semibold mb-2 flex items-center justify-center gap-1.5"><AlertCircle className="w-4 h-4" /> Failed to load quizzes</p>
+                <p className="text-muted-foreground text-xs mb-4">{(quizzesErr as any)?.message || "An unexpected error occurred."}</p>
+                <Button size="sm" onClick={() => refetchQuizzes()}>Try Again</Button>
+              </Card>
+            ) : quizzes.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground text-sm">No scriptural quizzes published yet</div>
             ) : (
-              quizzes.map((quiz) => (
-                <Card key={quiz.id} className="border border-border/40">
-                  <CardHeader>
-                    <CardTitle className="text-sm font-bold text-foreground flex items-center gap-1.5">
-                      <HelpCircle className="w-4 h-4 text-primary" /> {quiz.title}
-                    </CardTitle>
-                    <CardDescription>{quiz.description || "Test your devotional wisdom"}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {quiz.questions?.map((q: any) => {
-                      const optionsArray = Array.isArray(q.options) ? q.options : JSON.parse(q.options || "[]");
-                      return (
-                        <div key={q.id} className="space-y-3 p-4 bg-muted/20 border border-border/30 rounded-xl">
-                          <p className="text-sm font-semibold">{q.questionText}</p>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            {optionsArray.map((opt: string, idx: number) => (
-                              <button
-                                key={idx}
-                                onClick={() => submitQuizMutation.mutate({ quizId: quiz.id, answers: { [q.id]: opt } })}
-                                className="p-3 text-xs text-center border border-border/80 hover:bg-muted/40 rounded-lg font-medium transition-colors"
-                              >
-                                {opt}
-                              </button>
-                            ))}
+              <div className="space-y-6">
+                {quizzes.map((quiz) => (
+                  <Card key={quiz.id} className="border border-border/40">
+                    <CardHeader>
+                      <CardTitle className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                        <HelpCircle className="w-4 h-4 text-primary" /> {quiz.title}
+                      </CardTitle>
+                      <CardDescription>{quiz.description || "Test your devotional wisdom"}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {quiz.questions?.map((q: any) => {
+                        const optionsArray = Array.isArray(q.options) ? q.options : JSON.parse(q.options || "[]");
+                        return (
+                          <div key={q.id} className="space-y-3 p-4 bg-muted/20 border border-border/30 rounded-xl">
+                            <p className="text-sm font-semibold">{q.questionText}</p>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              {optionsArray.map((opt: string, idx: number) => (
+                                <button
+                                  key={idx}
+                                  onClick={() => submitQuizMutation.mutate({ quizId: quiz.id, answers: { [q.id]: opt } })}
+                                  className="p-3 text-xs text-center border border-border/80 hover:bg-muted/40 rounded-lg font-medium transition-colors"
+                                >
+                                  {opt}
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </CardContent>
-                </Card>
-              ))
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             )}
           </div>
         )}

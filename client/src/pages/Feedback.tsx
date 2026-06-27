@@ -31,6 +31,7 @@ export default function Feedback() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to submit feedback");
       return res.json();
@@ -49,6 +50,7 @@ export default function Feedback() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, adminNotes: notes }),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to update status");
       return res.json();

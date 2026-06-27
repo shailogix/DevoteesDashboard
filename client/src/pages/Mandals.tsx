@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Search, Plus, Edit, Trash2, Eye, Landmark, Users, MapPin, CalendarDays, Heart, HandHeart, Activity } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Eye, Landmark, Users, MapPin, CalendarDays, Heart, HandHeart, Activity, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
@@ -27,7 +27,7 @@ export default function Mandals() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
 
-  const { data: mandals = [], isLoading } = useQuery<Mandal[]>({ queryKey: ["/api/mandals"] });
+  const { data: mandals = [], isLoading, isError, error, refetch } = useQuery<Mandal[]>({ queryKey: ["/api/mandals"] });
   const { data: devotees = [] } = useQuery<Devotee[]>({ queryKey: ["/api/devotees"] });
   const { data: events = [] } = useQuery<Event[]>({ queryKey: ["/api/events"] });
   const { data: locations = [] } = useQuery<SabhaLocation[]>({ queryKey: ["/api/sabha-locations"] });
@@ -90,6 +90,28 @@ export default function Mandals() {
   const getMandalLocations = (mandalName: string) => locations.filter((l: SabhaLocation) => l.city?.toLowerCase().includes(mandalName.toLowerCase()));
 
   if (isLoading) return <LoadingSpinner />;
+
+  if (isError) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6 bg-background">
+        <Card className="max-w-md w-full border-destructive/20 shadow-elevation-2">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" /> Error Loading Mandals
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground text-sm">
+              {error instanceof Error ? error.message : "An unexpected error occurred while loading mandals."}
+            </p>
+            <Button onClick={() => refetch()} className="w-full flex items-center justify-center gap-2">
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-auto p-6">

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Header } from "@/components/Layout/Header";
 import { LoadingSpinner } from "@/components/Common/LoadingSpinner";
+import { useAuth } from "@/hooks/useAuth";
 import {
   ArrowLeft, Users, MapPin, Phone, Mail, Heart, Activity,
   HandHeart, AlertCircle, Home
@@ -16,30 +18,68 @@ import type { Family, Devotee } from "@shared/schema";
 export default function FamilyDetailPage() {
   const [match, params] = useRoute("/families/:id");
   const [, navigate] = useLocation();
+  const { isAdmin, isLeader, isLoading: authLoading } = useAuth();
   const id = params?.id ? parseInt(params.id) : null;
 
-  const { data: family, isLoading: familyLoading } = useQuery<Family>({
-    queryKey: ["/api/families", id],
-    queryFn: () => fetch(`/api/families/${id}`).then(r => r.json()),
-    enabled: !!id,
+  useEffect(() => {
+    if (!authLoading && !isAdmin && !isLeader) {
+      navigate("/");
+    }
+  }, [authLoading, isAdmin, isLeader, navigate]);
+
+  const { data: family, isLoading: familyLoading, isError, error, refetch } = useQuery<Family>({
+    queryKey: [`/api/families/${id}`],
+    enabled: !!id && (isAdmin || isLeader),
   });
 
   const { data: members = [] } = useQuery<Devotee[]>({
-    queryKey: ["/api/families", id, "members"],
-    queryFn: () => fetch(`/api/families/${id}/members`).then(r => r.json()),
-    enabled: !!id,
+    queryKey: [`/api/families/${id}/members`],
+    enabled: !!id && (isAdmin || isLeader),
   });
 
   const { data: stats } = useQuery<any>({
-    queryKey: ["/api/families", id, "stats"],
-    queryFn: () => fetch(`/api/families/${id}/stats`).then(r => r.json()),
-    enabled: !!id,
+    queryKey: [`/api/families/${id}/stats`],
+    enabled: !!id && (isAdmin || isLeader),
   });
+
+  if (authLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <LoadingSpinner size="lg" text="Checking credentials..." />
+      </div>
+    );
+  }
+
+  if (!isAdmin && !isLeader) {
+    return null;
+  }
 
   if (familyLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <LoadingSpinner size="lg" text="Loading family..." />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6 bg-background">
+        <Card className="max-w-md w-full border-destructive/20 shadow-elevation-2">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" /> Error Loading Family
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground text-sm">
+              {error instanceof Error ? error.message : "An unexpected error occurred while loading family details."}
+            </p>
+            <Button onClick={() => refetch()} className="w-full flex items-center justify-center gap-2">
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
